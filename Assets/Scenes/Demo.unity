@@ -1080,8 +1080,8 @@ MonoBehaviour:
   perfectWindow: 0.05
   greatWindow: 0.1
   goodWindow: 0.15
-  beatSound: {fileID: 8300000, guid: db37438ce6fd00043945f73c5c037627, type: 3}
-  hitSound: {fileID: 8300000, guid: b230ef9b2481c7046bfec2ce1ba468c0, type: 3}
+  beatSound: {fileID: 8300000, guid: 05433b54d16751a409cffc7770549dcd, type: 3}
+  hitSound: {fileID: 8300000, guid: 6ca5536e8714d8a4880ff37da101eed4, type: 3}
   perfectSound: {fileID: 0}
   minSlashSpeed: 1200
   minSlashDistance: 800
