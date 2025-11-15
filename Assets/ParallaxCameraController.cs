@@ -1,90 +1,111 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-[ExecuteAlways]
-public class OrthographicCameraController : MonoBehaviour
+public class ParallaxCameraController : MonoBehaviour
 {
-    [Header("相機移動設定")]
-    public float moveSpeed = 2f;               // 相機移動速度
-    public Transform endTarget;                // 停止目標
+    [Header("移動設定")]
+    public float moveSpeed = 2f;
+    public Transform endTarget;
+    public float maxMoveTime = 30f;
 
-    [Header("背景自動縮放")]
-    public List<Transform> backgroundLayers;
-    public float scaleMargin = 1.05f;
-    public float imageAspect = 16f / 9f;
+    [Header("碰撞反應")]
+    public float pauseDuration = 1f;
+    public float shakeIntensity = 0.3f;
+    public float shakeDuration = 0.4f;
+    public AudioClip hitSound;
+    public AudioSource audioSource;
 
-    [Header("立體效果設定")]
-    public float depthScaleFactor = 0.05f;
-    public float minDepthScale = 0.5f;
-    public float maxDepthScale = 3f;
+    [Header("模糊特效 (URP Volume)")]
+    public Volume postProcessingVolume;  // 拖進有 DepthOfField 的 Volume
+    private DepthOfField dof;            // 模糊控制元件
+    public float blurIntensity = 3f;     // 模糊強度
+    public float blurSpeed = 5f;         // 模糊變化速度
 
-    private Camera cam;
+    private bool isPaused = false;
+    private float moveTimer = 0f;
+    private Vector3 originalPos;
+    private float targetBlur = 0f;
 
-    void Awake()
+    void Start()
     {
-        cam = GetComponent<Camera>();
-        if (cam != null)
-            cam.orthographic = true;
+        originalPos = transform.position;
 
-        UpdateBackgroundScales();
+        if (audioSource == null)
+            audioSource = gameObject.AddComponent<AudioSource>();
+
+        // 嘗試取得 DepthOfField 元件
+        if (postProcessingVolume != null)
+            postProcessingVolume.profile.TryGet(out dof);
     }
 
     void Update()
     {
-        // Play 模式才自動移動相機
-        if (Application.isPlaying)
-        {
-            if (endTarget == null || transform.position.z < endTarget.position.z)
-            {
-                transform.Translate(Vector3.forward * moveSpeed * Time.deltaTime);
-            }
-        }
+        // 模糊動畫
+        // if (dof != null)
+        // {
+        //     dof.gaussianEnd = Mathf.Lerp(dof.gaussianEnd, targetBlur, Time.deltaTime * blurSpeed);
+        // }
 
-        // 無論是否 Play 都更新縮放
-        UpdateBackgroundScales();
+        if (isPaused) return;
+
+        moveTimer += Time.deltaTime;
+        transform.Translate(Vector3.forward * moveSpeed * Time.deltaTime);
+
+        if (endTarget != null && transform.position.z >= endTarget.position.z)
+        {
+            StopMovement();
+        }
+        else if (moveTimer >= maxMoveTime)
+        {
+            StopMovement();
+        }
     }
 
-    void OnValidate()
+    void StopMovement()
     {
-        UpdateBackgroundScales();
+        moveSpeed = 0;
+        Debug.Log("📍鏡頭已停止！");
     }
 
-    void UpdateBackgroundScales()
+    void OnTriggerEnter(Collider other)
     {
-        if (backgroundLayers == null || backgroundLayers.Count == 0) return;
-        if (cam == null) return;
-
-        float orthoHeight = cam.orthographicSize * 2f;
-        float orthoWidth = orthoHeight * cam.aspect;
-
-        foreach (Transform layer in backgroundLayers)
+        if (other.CompareTag("HitObject"))
         {
-            if (layer == null) continue;
-
-            float scaleX = orthoWidth * scaleMargin;
-            float scaleY = orthoHeight * scaleMargin;
-
-            if (scaleX / scaleY > imageAspect)
-                scaleX = scaleY * imageAspect;
-            else
-                scaleY = scaleX / imageAspect;
-
-            // Z 軸距離放大，每 15 單位放大 1 倍
-            // 計算 Z 軸距離
-
-float distanceZ = cam.transform.position.z - layer.position.z;
-
-// 線性平滑縮放
-float depthScale = 1 + distanceZ * depthScaleFactor;
-
-// 限制最小與最大值
-depthScale = Mathf.Clamp(depthScale, minDepthScale, maxDepthScale);
-
-// 套用縮放
-layer.localScale = new Vector3(scaleX * depthScale, scaleY * depthScale, 1f);
+            StartCoroutine(HitReaction());
         }
+    }
+
+    IEnumerator HitReaction()
+    {
+        isPaused = true;
+        Vector3 startPos = transform.position;
+
+        // 播放音效
+        if (hitSound != null)
+            audioSource.PlayOneShot(hitSound);
+
+        // 模糊 & 晃動
+        targetBlur = blurIntensity;
+
+        float elapsed = 0f;
+        while (elapsed < shakeDuration)
+        {
+            float offsetX = Random.Range(-shakeIntensity, shakeIntensity);
+            float offsetY = Random.Range(-shakeIntensity, shakeIntensity);
+            transform.position = startPos + new Vector3(offsetX, offsetY, 0);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        transform.position = startPos;
+
+        // 暫停
+        yield return new WaitForSeconds(pauseDuration);
+
+        // 恢復
+        targetBlur = 0f;
+        isPaused = false;
     }
 }

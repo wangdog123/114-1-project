@@ -6,6 +6,7 @@ public class ParallaxLayer
 {
     public Transform layerTransform;
     public float parallaxFactor = 0.5f;
+    public float scaleMargin = 1.05f;
     [HideInInspector] public float initialZ; // 記錄初始 Z
 }
 
@@ -13,7 +14,6 @@ public class ParallaxManager : MonoBehaviour
 {
     public List<ParallaxLayer> layers = new List<ParallaxLayer>();
     public Camera mainCamera;
-    public float scaleMargin = 1.05f;
     public float imageAspect = 16f / 9f;
 
     private float cameraInitialZ;
@@ -44,8 +44,8 @@ public class ParallaxManager : MonoBehaviour
             if (p.layerTransform == null) continue;
 
             // 縮放
-            float scaleX = orthoWidth * scaleMargin;
-            float scaleY = orthoHeight * scaleMargin;
+            float scaleX = orthoWidth * p.scaleMargin;
+            float scaleY = orthoHeight * p.scaleMargin;
             if (scaleX / scaleY > imageAspect)
                 scaleX = scaleY * imageAspect;
             else
@@ -57,7 +57,7 @@ public class ParallaxManager : MonoBehaviour
             p.layerTransform.position = new Vector3(
                 p.layerTransform.position.x,
                 p.layerTransform.position.y,
-                p.initialZ + zOffset
+                p.initialZ - zOffset
             );
         }
     }
