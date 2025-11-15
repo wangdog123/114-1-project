@@ -6,6 +6,7 @@ using TMPro;
 
 public class ScratchRhythmGame : MonoBehaviour
 {
+    public bool calijoycon = false;
     [Header("遊戲設置")]
     public VirtualCursor cursor; // 虛擬光標引用
     public int sequenceLength = 3; // 序列長度（例如：左-右-上）
@@ -118,7 +119,7 @@ public class ScratchRhythmGame : MonoBehaviour
         beatInterval = 60f / bpm;
         
         // 檢查是否需要校正
-        if (joyConController != null && !joyConController.Calibrated)
+        if (joyConController != null && !joyConController.Calibrated && calijoycon)
         {
             currentState = GameState.WaitingCalibration;
             ShowCalibrationPrompt();

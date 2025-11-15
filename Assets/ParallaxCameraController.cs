@@ -25,9 +25,9 @@ public class OrthographicCameraController : MonoBehaviour
 
     void Awake()
     {
-        cam = GetComponent<Camera>();
-        if (cam != null)
-            cam.orthographic = true;
+        // cam = GetComponent<Camera>();
+        // if (cam != null)
+        //     cam.orthographic = true;
 
         UpdateBackgroundScales();
     }
