@@ -46,3 +46,6 @@ TagManager:
   - name: CameraSortingLayer
     uniqueID: 4289073725
     locked: 0
+  - name: scene
+    uniqueID: 3626324977
+    locked: 0
