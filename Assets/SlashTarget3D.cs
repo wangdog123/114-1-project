@@ -7,6 +7,7 @@ using TMPro;
     [Header("3D 飛行設置")]
     public Transform spawnPoint; // 發射點（遠方）
     public Transform targetPoint; // 目標點（鏡頭前方）
+    public Vector3 targetOffset; // 目標點的偏移量
     public float arcHeight = 5f; // 拋物線高度
     
     [Header("3D 視覺組件")]
@@ -44,15 +45,8 @@ using TMPro;
     {
         isFlying = true;
         
-        if (spawnPoint != null)
-        {
-            startPosition = spawnPoint.position;
-            transform.position = startPosition;
-        }
-        else
-        {
-            startPosition = transform.position;
-        }
+        // 直接使用當前位置作為起點（允許外部設置偏移）
+        startPosition = transform.position;
         
         Debug.Log($"[飛行] 物件 #{stepIndex} 開始飛行，從 {startPosition} 飛向目標點");
     }
@@ -74,7 +68,9 @@ using TMPro;
         float smoothProgress = Mathf.SmoothStep(0f, 1f, flyingProgress);
         
         // ★ 拋物線飛行：在起點和目標點之間加上高度曲線
-        Vector3 currentPos = Vector3.Lerp(startPosition, targetPoint.position, smoothProgress);
+        // 加上 targetOffset 確保飛行路徑平行（如果需要）
+        Vector3 endPosition = targetPoint.position + targetOffset;
+        Vector3 currentPos = Vector3.Lerp(startPosition, endPosition, smoothProgress);
         
         // 使用 sin 曲線創造拋物線效果（在飛行中間達到最高點）
         float heightOffset = Mathf.Sin(flyingProgress * Mathf.PI) * arcHeight;
@@ -109,11 +105,11 @@ using TMPro;
             case ScratchRhythmGame.SlashDirection.Left:
                 zRotation = 0f;
                 break;
-            case ScratchRhythmGame.SlashDirection.Up:
-                zRotation = -90f;
+            case ScratchRhythmGame.SlashDirection.DownLeft:
+                zRotation = 45f; // 左斜下
                 break;
-            case ScratchRhythmGame.SlashDirection.Down:
-                zRotation = 90f;
+            case ScratchRhythmGame.SlashDirection.DownRight:
+                zRotation = 135f; // 右斜下
                 break;
         }
         

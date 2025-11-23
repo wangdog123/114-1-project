@@ -7,6 +7,10 @@ using Unity.Mathematics;
 
 public class test : MonoBehaviour
 {
+    [Header("控制器設定")]
+    public MultiSwitchControllerManager controllerManager; // 控制器管理器
+    public int controllerIndex = 0; // 使用哪一個控制器（0 = 第一個，1 = 第二個）
+
     public Vector3 acclelOffset = new Vector3(0.97f, -0.01f, -0.2f);
     public Vector3 acclelOffsetwhen45 = new Vector3(0.45f, 0.35f, 0.8f);
 
@@ -42,7 +46,7 @@ public class test : MonoBehaviour
 
     private Vector3 aRaw;
     private Vector3 aWorld;
-    private Vector3 alinear;
+    public Vector3 alinear; // 公開給其他腳本使用（線性加速度）
     private Vector3 amag;
     private Vector3 targetPosition;
     private bool isMoving = false;
@@ -61,18 +65,50 @@ public class test : MonoBehaviour
     private Vector3 currentGyro;
     private Vector3 worldGyro;
 
+    // 當前使用的控制器
+    private SwitchControllerHID currentController;
+
 
     // Start is called before the first frame update
     void Start()
     {
-        if(SwitchControllerHID.current == null)
+        // 如果沒有指定管理器，嘗試自動找到
+        if (controllerManager == null)
+        {
+            controllerManager = FindObjectOfType<MultiSwitchControllerManager>();
+        }
+
+        if (controllerManager == null)
+        {
+            Debug.LogError("找不到 MultiSwitchControllerManager！請在場景中添加此組件。");
             return;
-        SwitchControllerHID.current.SetIMUEnabled(true);
+        }
+
+        // 等待一幀確保控制器列表已更新
+        StartCoroutine(InitializeController());
+    }
+
+    IEnumerator InitializeController()
+    {
+        yield return null; // 等待一幀
+
+        // 獲取指定索引的控制器
+        currentController = controllerManager.GetController(controllerIndex);
+
+        if (currentController == null)
+        {
+            Debug.LogError($"找不到索引 {controllerIndex} 的控制器！當前連接: {controllerManager.ControllerCount} 個");
+            yield break;
+        }
+
+        Debug.Log($"使用控制器 {controllerIndex}: {currentController.name} (ID: {currentController.deviceId})");
+
+        currentController.SetIMUEnabled(true);
         // 讀取 IMU 校準資料
-        SwitchControllerHID.current.ReadUserIMUCalibrationData();
+        currentController.ReadUserIMUCalibrationData();
 
         // 初始化陀螺仪数据
-        lastGyro = SwitchControllerHID.current.angularVelocity.ReadValue();
+        lastGyro = currentController.angularVelocity.ReadValue();
         gyroPosition = Vector3.zero;
         
         // 如果启用自动校准，启动校准协程
@@ -97,13 +133,15 @@ public class test : MonoBehaviour
         Debug.Log("开始陀螺仪校准，请将手柄平放在桌上保持静止 3 秒...");
         yield return new WaitForSeconds(0.5f); // 等待 1 秒稳定
         
+        if (currentController == null) yield break;
+
         // 多次采样取平均，减少误差
         Vector3 sum = Vector3.zero;
         int samples = 30;
         
         for (int i = 0; i < samples; i++)
         {
-            sum += SwitchControllerHID.current.angularVelocity.ReadValue();
+            sum += currentController.angularVelocity.ReadValue();
             yield return new WaitForSeconds(0.1f);
         }
         
@@ -114,10 +152,10 @@ public class test : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (SwitchControllerHID.current == null)
+        if (currentController == null)
             return;
         // 按 West 键（Y键）暂停/继续
-            if (SwitchControllerHID.current.buttonWest.wasPressedThisFrame)
+            if (currentController.buttonWest.wasPressedThisFrame)
             {
                 if (Time.timeScale > 0f)
                 {
@@ -131,16 +169,24 @@ public class test : MonoBehaviour
             }
             
             // 按 North 键（X键）手动校准陀螺仪偏移
-            if (SwitchControllerHID.current.buttonNorth.wasPressedThisFrame)
+            if (currentController.buttonNorth.wasPressedThisFrame)
             {
                 StartCoroutine(CalibrateGyroOffset());
                 return;
             }
             
             // 按 South 键（B键）重新校准朝向（当你改变握持方式时）
-            if (SwitchControllerHID.current.buttonSouth.wasPressedThisFrame)
+            if (controllerManager.Controllers[controllerIndex].buttonSouth.wasPressedThisFrame)
             {
-                Vector3 recalibratedOrientationEuler = SwitchControllerHID.current.orientation.ReadValue();
+                Vector3 recalibratedOrientationEuler = currentController.orientation.ReadValue();
+                initialOrientation = Quaternion.Euler(recalibratedOrientationEuler);
+                orientationCalibrated = true;
+                Calibrated = true;
+                Debug.Log($"朝向已重新校准: {recalibratedOrientationEuler}");
+            }
+            if (controllerManager.Controllers[controllerIndex].dpad.down.wasPressedThisFrame)
+            {
+                Vector3 recalibratedOrientationEuler = currentController.orientation.ReadValue();
                 initialOrientation = Quaternion.Euler(recalibratedOrientationEuler);
                 orientationCalibrated = true;
                 Calibrated = true;
@@ -153,8 +199,8 @@ public class test : MonoBehaviour
             if (!Calibrated)
                 return;
             // 讀取 IMU 數據
-            aRaw = SwitchControllerHID.current.acceleration.ReadValue();
-            Vector3 orientationEuler = SwitchControllerHID.current.orientation.ReadValue();
+            aRaw = currentController.acceleration.ReadValue();
+            Vector3 orientationEuler = currentController.orientation.ReadValue();
             orientation = Quaternion.Euler(orientationEuler); // 將 Vector3 歐拉角轉換為 Quaternion
 
             // 【已修正】使用 Quaternion 直接計算世界座標加速度
@@ -257,7 +303,7 @@ public class test : MonoBehaviour
     void MoveMouse()
     {
         // 1. 读取陀螺仪数据（角速度，单位：弧度/秒）
-        currentGyro = SwitchControllerHID.current.angularVelocity.ReadValue();
+        currentGyro = currentController.angularVelocity.ReadValue();
         
         // 2. 移除陀螺仪漂移偏移（固定偏移值，不管手柄怎么拿）
         Vector3 calibratedGyro = currentGyro;
@@ -318,7 +364,10 @@ public class test : MonoBehaviour
         // 6. 移动虚拟光标
         if ((Mathf.Abs(mouseX) > 0.0001f || Mathf.Abs(mouseY) > 0.0001f) && virtualCursor != null)
         {
-            virtualCursor.MoveCursor(mouseX, mouseY);
+            if(controllerIndex == 1)
+                virtualCursor.MoveCursor(-mouseX, -mouseY);
+            else
+                virtualCursor.MoveCursor(mouseX, mouseY);
         }
 
         // 更新上一帧的陀螺仪数据
@@ -407,9 +456,9 @@ public class test : MonoBehaviour
     // 重置陀螺儀追蹤狀態（當光標重置時呼叫）
     public void ResetGyroTracking()
     {
-        if (SwitchControllerHID.current != null)
+        if (currentController != null)
         {
-            lastGyro = SwitchControllerHID.current.angularVelocity.ReadValue();
+            lastGyro = currentController.angularVelocity.ReadValue();
             gyroPosition = Vector3.zero;
             Debug.Log("[test] 陀螺儀追蹤已重置");
         }

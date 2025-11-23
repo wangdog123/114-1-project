@@ -60,11 +60,11 @@ public class SlashTarget : MonoBehaviour
             case ScratchRhythmGame.SlashDirection.Left:
                 angle = 180f; // 水平向左
                 break;
-            case ScratchRhythmGame.SlashDirection.Up:
-                angle = 90f; // 垂直向上
+            case ScratchRhythmGame.SlashDirection.DownLeft:
+                angle = 135f; // 左斜下 (135度)
                 break;
-            case ScratchRhythmGame.SlashDirection.Down:
-                angle = -90f; // 垂直向下
+            case ScratchRhythmGame.SlashDirection.DownRight:
+                angle = -45f; // 右斜下 (-45度)
                 break;
         }
         

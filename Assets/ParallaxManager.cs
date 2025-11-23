@@ -21,6 +21,22 @@ public class ParallaxManager : MonoBehaviour
     [Range(0, 1)]
     public float dynamicScaleFactor = 0.1f; // How much the scale changes based on distance. 0 = no change, 1 = full dynamic scaling.
 
+    [Header("Head Bob & Footsteps")]
+    public bool enableHeadBob = true;
+    public float bobFrequency = 6f;      // 晃動頻率（腳步速度）
+    public float bobAmplitude = 0.05f;   // 晃動幅度
+    public bool enableFootsteps = true;
+    public System.Collections.Generic.List<AudioClip> footstepSounds; // 腳步聲音效列表
+    [Range(0f, 1f)] public float footstepVolume = 0.5f;
+
+    [Header("Hit Stop Settings")]
+    public float hitStopDuration = 0.5f; // 被打到時停止的時間
+    private float currentHitStopTimer = 0f;
+
+    private float bobTimer = 0f;
+    private bool stepPlayed = false;
+    private AudioSource footstepAudioSource;
+
     // Store initial scales and distances for each layer
     private Vector3[] _initialScales;
     private float[] _initialDistances;
@@ -181,6 +197,11 @@ public class ParallaxManager : MonoBehaviour
         {
             cam = Camera.main;
         }
+        
+        footstepAudioSource = GetComponent<AudioSource>();
+        if (footstepAudioSource == null)
+            footstepAudioSource = gameObject.AddComponent<AudioSource>();
+            
         InitializeParallax();
 
         if (Application.isPlaying && moveOnStart)
@@ -201,6 +222,15 @@ public class ParallaxManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.M))
         {
             StartCameraMove();
+        }
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            // Reset camera position to the start position
+            if (cam != null)
+            {
+                cam.transform.position = new Vector3(cam.transform.position.x, cam.transform.position.y, 0f);
+                Debug.Log("Camera position reset to start.");
+            }
         }
     }
 
@@ -235,28 +265,106 @@ public class ParallaxManager : MonoBehaviour
         _cameraMoveCoroutine = StartCoroutine(MoveCameraCoroutine(finalTargetPosition, cameraMoveDuration));
     }
 
+    /// <summary>
+    /// 觸發被打到時的停止效果
+    /// </summary>
+    public void TriggerHitStop()
+    {
+        currentHitStopTimer = hitStopDuration;
+    }
+
     private IEnumerator MoveCameraCoroutine(Vector3 targetPosition, float duration)
     {
         if (cam == null) yield break;
 
         float elapsedTime = 0f;
+        float movementProgressTime = 0f; // 追蹤實際移動的時間進度
         Vector3 startingPosition = cam.transform.position;
+        
+        // Reset bob timer
+        bobTimer = 0f;
+        stepPlayed = false;
+        currentHitStopTimer = 0f;
 
         while (elapsedTime < duration)
         {
-            // Use Lerp to interpolate the position
-            cam.transform.position = Vector3.Lerp(startingPosition, targetPosition, elapsedTime / duration);
-            
-            // Increment the elapsed time
+            // 總時間總是流逝 (維持總時長不變)
             elapsedTime += Time.deltaTime;
+
+            if (currentHitStopTimer > 0)
+            {
+                currentHitStopTimer -= Time.deltaTime;
+                // 暈眩中：不增加移動進度，不更新位置
+            }
+            else
+            {
+                // 只有沒暈眩時才增加移動進度
+                movementProgressTime += Time.deltaTime;
+
+                // 使用 movementProgressTime 來計算位置
+                // 這樣如果中間有停頓，最終位置就會不到達終點 (movementProgressTime < duration)
+                Vector3 currentPos = Vector3.Lerp(startingPosition, targetPosition, movementProgressTime / duration);
+                
+                // Apply Head Bob
+                if (enableHeadBob)
+                {
+                    bobTimer += Time.deltaTime * bobFrequency;
+                    float bobOffset = Mathf.Sin(bobTimer) * bobAmplitude;
+                    currentPos.y += bobOffset;
+                    
+                    // Handle Footsteps
+                    if (enableFootsteps)
+                    {
+                        HandleFootsteps();
+                    }
+                }
+                
+                cam.transform.position = currentPos;
+            }
             
             // Wait for the next frame
             yield return null;
         }
 
-        // Ensure the camera reaches the exact target position at the end
-        cam.transform.position = targetPosition;
+        // 時間到，結束移動。
+        // 注意：不強制設定為 targetPosition，因為如果中間有暈眩，玩家應該到不了終點。
         _cameraMoveCoroutine = null;
+    }
+    
+    private void HandleFootsteps()
+    {
+        if (footstepSounds == null || footstepSounds.Count == 0) return;
+
+        // 當 Sin 波接近谷底 (-1) 時播放腳步聲
+        float cyclePos = Mathf.Sin(bobTimer);
+        
+        // 閾值設為 -0.9，表示接近最低點（腳步落地）
+        if (cyclePos < -0.9f && !stepPlayed)
+        {
+            PlayFootstep();
+            stepPlayed = true;
+        }
+        // 當波形回升超過 -0.5 時重置標記，準備下一次腳步
+        else if (cyclePos > -0.5f)
+        {
+            stepPlayed = false;
+        }
+    }
+
+    private void PlayFootstep()
+    {
+        if (footstepSounds.Count == 0) return;
+        
+        // 隨機選擇一個腳步聲
+        int index = Random.Range(0, footstepSounds.Count);
+        AudioClip clip = footstepSounds[index];
+        
+        if (clip != null && footstepAudioSource != null)
+        {
+            // 稍微隨機化音高，增加自然感
+            footstepAudioSource.pitch = Random.Range(0.9f, 1.1f);
+            footstepAudioSource.PlayOneShot(clip, footstepVolume);
+        }
     }
 
     void OnValidate()
