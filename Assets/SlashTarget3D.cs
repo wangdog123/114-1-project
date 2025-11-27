@@ -141,7 +141,7 @@ using TMPro;
             meshRenderer.material.color = Color.red;
         }
         
-        Destroy(gameObject, 0.5f);
+        Destroy(gameObject, 0f);
     }
     
     // 檢查是否還在活動
