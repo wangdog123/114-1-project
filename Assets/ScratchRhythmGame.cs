@@ -127,7 +127,7 @@ public class ScratchRhythmGame : MonoBehaviour
     // 方向枚舉（大野狼抓取動作）
     public enum SlashDirection { Left, Right, DownLeft, DownRight }
     
-    void Start()
+    void OnEnable()
     {
         // 初始化音效組件
         audioSource = GetComponent<AudioSource>();
@@ -214,6 +214,15 @@ public class ScratchRhythmGame : MonoBehaviour
     
     void Update()
     {
+        // 檢查是否需要校正（無論什麼狀態，只要需要校正就切換）
+        if (calijoycon && !AreAllConnectedControllersCalibrated() && currentState != GameState.WaitingCalibration)
+        {
+            currentState = GameState.WaitingCalibration;
+            ShowCalibrationPrompt();
+            Debug.Log("[Update] 檢測到未校正的手把，進入校正模式");
+            return;
+        }
+
         // 等待校正狀態
         if (currentState == GameState.WaitingCalibration)
         {
@@ -1524,16 +1533,13 @@ public class ScratchRhythmGame : MonoBehaviour
             Transform parent3D = targets3DParent != null ? targets3DParent : null;
             targetObj = Instantiate(slashTargetPrefab, parent3D);
             
-            Vector3 offset = Vector3.zero;
             if (spawnPoint != null)
             {
                 Vector3 position = spawnPoint.position;
                 
                 // 加上隨機 X 偏移，避免生成在一條直線上
                 float worldOffsetX = targetXOffsetRange / 100f; // 將 Canvas 單位轉換為世界單位 (可調整)
-                float randomX = Random.Range(-worldOffsetX, worldOffsetX);
-                offset.x = randomX;
-                position.x += randomX;
+                position.x += Random.Range(-worldOffsetX, worldOffsetX);
                 
                 targetObj.transform.position = position;
             }
@@ -1548,8 +1554,6 @@ public class ScratchRhythmGame : MonoBehaviour
             target3D.hasPlayedJudgmentBeat = false;
             target3D.spawnPoint = spawnPoint;
             target3D.targetPoint = targetPoint;
-            target3D.targetOffset = offset; // 設置目標點偏移
-            target3D.customInterval = beatInterval;
             target3D.customInterval = beatInterval;
             target3D.flyingStartTime = Time.time;
             target3D.flyingDuration = flyingDuration;

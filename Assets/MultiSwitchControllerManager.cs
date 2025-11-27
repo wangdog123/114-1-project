@@ -71,25 +71,7 @@ public class MultiSwitchControllerManager : MonoBehaviour
 
     void Awake()
     {
-        // 單例模式初始化
-        if (instance == null)
-        {
-            instance = this;
-            DontDestroyOnLoad(gameObject); // 讓此物件在切換場景時不被銷毀
-        }
-        else if (instance != this)
-        {
-            // 如果已經有另一個實例存在（例如從場景 A 切換到場景 B，場景 B 也有這個 Manager）
-            // 銷毀新的這個，保留舊的（帶有數據的）
-            Destroy(gameObject);
-            return;
-        }
 
-        // 訂閱設備變化事件
-        if (autoUpdateControllers)
-        {
-            InputSystem.onDeviceChange += OnDeviceChange;
-        }
     }
 
     /// <summary>
@@ -125,10 +107,29 @@ public class MultiSwitchControllerManager : MonoBehaviour
         return calibrationDataMap.TryGetValue(deviceId, out data);
     }
 
-    void Start()
+    void OnEnable()
     {
         // 初始化時掃描所有已連接的控制器
         UpdateControllerList();
+                // 單例模式初始化
+        if (instance == null)
+        {
+            instance = this;
+            DontDestroyOnLoad(gameObject); // 讓此物件在切換場景時不被銷毀
+        }
+        else if (instance != this)
+        {
+            // 如果已經有另一個實例存在（例如從場景 A 切換到場景 B，場景 B 也有這個 Manager）
+            // 銷毀新的這個，保留舊的（帶有數據的）
+            Destroy(gameObject);
+            return;
+        }
+
+        // 訂閱設備變化事件
+        if (autoUpdateControllers)
+        {
+            InputSystem.onDeviceChange += OnDeviceChange;
+        }
     }
 
     void OnDestroy()

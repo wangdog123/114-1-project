@@ -70,7 +70,7 @@ public class test : MonoBehaviour
 
 
     // Start is called before the first frame update
-    void Start()
+    void OnEnable()
     {
         // 如果沒有指定管理器，嘗試自動找到
         if (controllerManager == null)
@@ -87,6 +87,7 @@ public class test : MonoBehaviour
         // 等待一幀確保控制器列表已更新
         StartCoroutine(InitializeController());
     }
+
 
     IEnumerator InitializeController()
     {
@@ -192,7 +193,7 @@ public class test : MonoBehaviour
             }
             
             // 按 South 键（B键）重新校准朝向（当你改变握持方式时）
-            if (controllerManager.Controllers[controllerIndex].buttonSouth.wasPressedThisFrame)
+            if (currentController.buttonSouth.wasPressedThisFrame)
             {
                 Vector3 recalibratedOrientationEuler = currentController.orientation.ReadValue();
                 initialOrientation = Quaternion.Euler(recalibratedOrientationEuler);
@@ -203,7 +204,7 @@ public class test : MonoBehaviour
                 // 保存到 Manager
                 controllerManager.SaveCalibration(currentController.deviceId, gyroOffset, initialOrientation, Calibrated);
             }
-            if (controllerManager.Controllers[controllerIndex].dpad.down.wasPressedThisFrame)
+            if (currentController.dpad.down.wasPressedThisFrame)
             {
                 Vector3 recalibratedOrientationEuler = currentController.orientation.ReadValue();
                 initialOrientation = Quaternion.Euler(recalibratedOrientationEuler);
@@ -398,7 +399,7 @@ public class test : MonoBehaviour
             // 統一邏輯：根據測試結果，如果發現左右反了，可以在這裡統一反轉
             // 假設現在上下正常，左右反了，我們把 mouseX 乘上 -1
             
-            if(controllerIndex == 1)
+            if(this.name=="left")
                 virtualCursor.MoveCursor(-mouseX, -mouseY);
             else
                 virtualCursor.MoveCursor(mouseX, mouseY); // 這裡把 mouseX 加了負號試試

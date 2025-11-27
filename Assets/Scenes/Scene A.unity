@@ -766,7 +766,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 0}
+  m_Material: {fileID: 2100000, guid: dccab1c5bf7591f43881819ce7f9fb4f, type: 2}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
@@ -2180,7 +2180,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a751bd5cb6187f3469f5cc90e6dab3cf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  calijoycon: 0
+  calijoycon: 1
   cursors:
   - {fileID: 2112445411}
   - {fileID: 1466005446}
@@ -2204,7 +2204,7 @@ MonoBehaviour:
   targetXOffsetRange: 500
   currentLevel: 1
   speedMultiplier: 1
-  flyingDuration: 6
+  flyingDuration: 1
   maxSequenceLength: 6
   variationStartLevel: 5
   variationChance: 0.3
@@ -2729,7 +2729,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1144619514
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2742,7 +2742,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 73d18202e21b227409e15c3d5056ba96, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  nextStateKey: 279
+  nextStateKey: 13
   sceneAName: Scene A
   sceneBName: Scene B
   sceneAObjects:
@@ -3698,7 +3698,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1351572150
 Transform:
   m_ObjectHideFlags: 0
@@ -4380,7 +4380,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1482737895
 Transform:
   m_ObjectHideFlags: 0
@@ -4434,12 +4434,11 @@ MonoBehaviour:
   - {fileID: 1027636096}
   - {fileID: 1666904287}
   - {fileID: 1854467364}
-  - {fileID: 1796645591}
   cameraTargetTransform: {fileID: 1854467364}
-  cameraMoveDuration: 5
+  cameraMoveDuration: 15
   stopDistancePercent: 50
   moveOnStart: 0
-  dynamicScaleFactor: 0.1
+  dynamicScaleFactor: 0.4
   enableHeadBob: 1
   bobFrequency: 10
   bobAmplitude: 0.4
@@ -4451,6 +4450,13 @@ MonoBehaviour:
   - {fileID: 8300000, guid: e18d13e99e75e8341b4a23c0e4dea64f, type: 3}
   footstepVolume: 0.5
   hitStopDuration: 1.5
+  dizzyDuration: 2
+  dizzySpeed: 0.8
+  dizzyStrengthX: 8
+  dizzyStrengthY: 5
+  fadeInDuration: 0.2
+  recoveryDuration: 0.5
+  amplitudeJitter: 0.3
 --- !u!82 &1482737897
 AudioSource:
   m_ObjectHideFlags: 0
@@ -6040,7 +6046,7 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 0
+  m_RenderPostProcessing: 1
   m_Antialiasing: 0
   m_AntialiasingQuality: 2
   m_StopNaN: 0
@@ -6201,7 +6207,7 @@ MonoBehaviour:
   mouseSensitivity: 50
   gyroDeadzone: {x: 5, y: 5, z: 5}
   gyroOffset: {x: -0.12, y: 0, z: 0.06}
-  Calibrated: 1
+  Calibrated: 0
   calibrateOrientation: 1
   useWorldCoordinates: 1
   showDebugInfo: 1
@@ -7103,7 +7109,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8080c744abd83342b7c034716a44043, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sceneNameToLoad: Demo 1
+  sceneNameToLoad: Scene B
   triggerKey: 32
 --- !u!4 &1912883048
 Transform:
@@ -7138,7 +7144,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1916805025
 RectTransform:
   m_ObjectHideFlags: 0
@@ -7228,6 +7234,55 @@ Canvas:
   m_SortingLayerID: 0
   m_SortingOrder: 0
   m_TargetDisplay: 0
+--- !u!1 &1919505309
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1919505311}
+  - component: {fileID: 1919505310}
+  m_Layer: 0
+  m_Name: dizzy
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1919505310
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1919505309}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 172515602e62fb746b5d573b38a5fe58, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_IsGlobal: 1
+  priority: 0
+  blendDistance: 0
+  weight: 0
+  sharedProfile: {fileID: 11400000, guid: 9c9d6630c3a12364fa80b3b26c3c5b08, type: 2}
+--- !u!4 &1919505311
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1919505309}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0, y: 0, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1920435579
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8048,7 +8103,7 @@ MonoBehaviour:
   mouseSensitivity: 50
   gyroDeadzone: {x: 5, y: 5, z: 5}
   gyroOffset: {x: -0.12, y: 0, z: 0.06}
-  Calibrated: 1
+  Calibrated: 0
   calibrateOrientation: 1
   useWorldCoordinates: 1
   showDebugInfo: 1
@@ -8217,6 +8272,7 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 1680452458}
+  - {fileID: 1919505311}
   - {fileID: 619394802}
   - {fileID: 1482737895}
   - {fileID: 149980347}

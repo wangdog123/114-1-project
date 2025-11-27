@@ -94,7 +94,7 @@ public class SceneController : MonoBehaviour
     void UpdateCurrentState()
     {
         // 先隱藏所有UI
-        HideAllUI();
+        // HideAllUI();
 
         // 根據當前state顯示對應的UI
         switch (currentState)
@@ -132,6 +132,8 @@ public class SceneController : MonoBehaviour
             case GameState.Gameplay:
                 if (gameplayUI != null)
                     gameplayUI.SetActive(true);
+                if (rhythmGame != null)
+                    rhythmGame.enabled = true;
                 break;
 
             case GameState.GameplayLoading:
