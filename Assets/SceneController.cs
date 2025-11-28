@@ -17,6 +17,7 @@ public class SceneController : MonoBehaviour
     [Header("UI控制")]
     public GameObject preparationUI;    // 準備階段UI (主視覺/Live2D)
     public GameObject prologueUI;       // 前導階段UI (動畫、劇情、教學)
+    public GameObject tutorialUI;       // 教學階段UI (可選)
     public GameObject gameplayUI;       // 遊戲階段UI
     public List<GameObject> scoreUI;          // 分數展示UI (積分、排行榜)
     public GameObject goodEndingUI;     // Good Ending UI (結局動畫/劇情)
@@ -53,12 +54,16 @@ public class SceneController : MonoBehaviour
         EndingLoading        // 收尾完成 → 準備返回(偽loading)
     }
 
-    private GameState currentState = GameState.Preparation;
+    public GameState currentState;
     private string currentScene = "";
     private ScratchRhythmGame rhythmGame;
     private bool isTransitioning = false; // 是否在過渡中
+    // 如果場景A是從場景B繼承 EndingType，設定此旗標以避免 SetupSceneA 覆寫初始狀態
+    private bool inheritedEndingPending = false;
+    // 紀錄是否已處理繼承的 Ending（用於避免重複初始化時被覆寫）
+    private bool inheritedEndingHandled = false;
 
-    void Start()
+    void OnEnable()
     {
         // 讀取當前場景名稱
         currentScene = SceneManager.GetActiveScene().name;
@@ -120,8 +125,8 @@ public class SceneController : MonoBehaviour
                 break;
 
             case GameState.Tutorial:
-                if (prologueUI != null)
-                    prologueUI.SetActive(true);
+                if (tutorialUI != null)
+                    tutorialUI.SetActive(true);
                 break;
 
             case GameState.TutorialLoading:
@@ -188,9 +193,35 @@ public class SceneController : MonoBehaviour
     /// </summary>
     void InitializeScene()
     {
+        // 嘗試從 PlayerPrefs 恢復繼承的 EndingType（若先前從場景B傳來）
+        bool hadInheritedEnding = false;
+        // 不在此重置 inheritedEndingPending — 我們需要保留該旗標直到處理完成
+        if (PlayerPrefs.HasKey("InheritedEndingType"))
+        {
+            int stored = PlayerPrefs.GetInt("InheritedEndingType");
+            if (System.Enum.IsDefined(typeof(EndingType), stored))
+            {
+                currentEndingType = (EndingType)stored;
+                hadInheritedEnding = true;
+                inheritedEndingPending = true;
+                inheritedEndingHandled = false;
+                Debug.Log($"[SceneController] 恢復繼承的 EndingType: {currentEndingType}");
+            }
+            PlayerPrefs.DeleteKey("InheritedEndingType");
+        }
+
         if (currentScene == sceneAName)
         {
             SetupSceneA();
+
+            // 如果剛剛有繼承的 EndingType，直接進入 ScoreDisplay
+            if (hadInheritedEnding)
+            {
+                SetState(GameState.ScoreDisplay);
+                // 標記為已處理，避免之後的 InitializeScene 覆寫
+                inheritedEndingHandled = true;
+                inheritedEndingPending = false;
+            }
         }
         else if (currentScene == sceneBName)
         {
@@ -204,9 +235,13 @@ public class SceneController : MonoBehaviour
     void SetupSceneA()
     {
         Debug.Log("[SceneController] === 場景A初始化 ===");
+        HideAllUI();
         
-        // 進入初始狀態 Preparation
-        SetState(GameState.Preparation);
+        // 進入初始狀態 Preparation（若有繼承的 Ending 或已處理則不要覆寫）
+        if (!inheritedEndingPending && !inheritedEndingHandled)
+        {
+            SetState(GameState.Preparation);
+        }
 
         // 啟用場景A物件
         foreach (var obj in sceneAObjects)
@@ -226,6 +261,7 @@ public class SceneController : MonoBehaviour
         rhythmGame = FindObjectOfType<ScratchRhythmGame>();
         if (rhythmGame != null)
             rhythmGame.enabled = false;
+        UpdateCurrentState();
     }
 
     /// <summary>
@@ -233,10 +269,11 @@ public class SceneController : MonoBehaviour
     /// </summary>
     void SetupSceneB()
     {
+        HideAllUI();
         Debug.Log("[SceneController] === 場景B初始化 ===");
 
-        // 進入初始狀態 Prologue
-        SetState(GameState.Prologue);
+        // 進入初始狀態 Tutorial
+        SetState(GameState.Tutorial);
 
         // 啟用場景B物件
         foreach (var obj in sceneBObjects)
@@ -254,6 +291,9 @@ public class SceneController : MonoBehaviour
 
         // 初始化遊戲邏輯（但暫不啟用）
         rhythmGame = FindObjectOfType<ScratchRhythmGame>();
+        if (rhythmGame != null)
+            rhythmGame.enabled = false;
+        UpdateCurrentState();
     }
 
     /// <summary>
@@ -296,13 +336,18 @@ public class SceneController : MonoBehaviour
 
             case GameState.PrologueLoading:
                 Debug.Log("[SceneController] === 前導Loading ===");
-                StartCoroutine(ShowLoadingTransition(GameState.Gameplay));
+                StartCoroutine(ShowLoadingTransition(GameState.Tutorial));
                 break;
 
             case GameState.Tutorial:
                 Debug.Log("[SceneController] === 教學階段 ===");
-                if (prologueUI != null)
-                    prologueUI.SetActive(true); // 教學也用前導UI
+                if(currentScene == sceneAName)
+                {
+                    SceneManager.LoadScene(sceneBName);
+                    return;
+                }
+                if (tutorialUI != null)
+                    tutorialUI.SetActive(true); // 教學也用前導UI
                 if (rhythmGame != null)
                     rhythmGame.enabled = false; // 教學不真正開始遊戲
                 break;
@@ -329,6 +374,15 @@ public class SceneController : MonoBehaviour
 
             case GameState.ScoreDisplay:
                 Debug.Log("[SceneController] === 顯示分數階段 ===");
+                if(currentScene == sceneBName)
+                {
+                    PlayerPrefs.SetInt("InheritedEndingType", (int)currentEndingType);
+                    PlayerPrefs.SetString(GameState.ScoreDisplay.ToString(), currentState.ToString());
+                    PlayerPrefs.Save();
+                    Debug.Log($"[SceneController] 儲存 EndingType 給場景A: {currentEndingType}");
+                    SceneManager.LoadScene(sceneAName);
+                    return;
+                }
                 if (scoreUI != null)
                 {
                     foreach (var ui in scoreUI)
@@ -380,10 +434,14 @@ public class SceneController : MonoBehaviour
     /// </summary>
     void HideAllUI()
     {
+        if (loadingUI != null)
+            loadingUI.SetActive(false);
         if (preparationUI != null)
             preparationUI.SetActive(false);
         if (prologueUI != null)
             prologueUI.SetActive(false);
+        if (tutorialUI != null)
+            tutorialUI.SetActive(false);
         if (gameplayUI != null)
             gameplayUI.SetActive(false);
         if (scoreUI != null)
