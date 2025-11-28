@@ -8,7 +8,7 @@ public class ScratchRhythmGame : MonoBehaviour
 {
     public bool calijoycon = false;
     [Header("遊戲設置")]
-    public VirtualCursor cursor; // 虛擬光標引用
+    public VirtualCursor[] cursors; // 虛擬光標陣列（支援多個控制器）
     public int sequenceLength = 3; // 序列長度（例如：左-右-上）
     
     [Header("節奏設置")]
@@ -31,8 +31,17 @@ public class ScratchRhythmGame : MonoBehaviour
     public AudioClip perfectSound; // Perfect 音效
     private AudioSource audioSource;
     
+    [Header("VFX 特效")]
+    public RhythmGameVFXManager vfxManager; // VFX 管理器（可選）
+    
+    [Header("震動回饋")]
+    public VibrationManager vibrationManager; // 震動管理器（可選）
+
+    [Header("視差背景管理")]
+    public ParallaxManager parallaxManager; // 視差背景管理器（可選）
+    
     [Header("劃痕檢測設置 - v3")]
-    public float minSlashSpeed = 1200f;        // 觸發劃動的最低瞬時速度 (px/s)
+    public float minSlashAccel = 1.5f;         // 觸發劃動的最低加速度閾值（使用 Joy-Con 加速度計）
     public float minSlashDistance = 100f;      // 有效劃動的最短直線距離
     public float slashAnalysisWindow = 0.15f;  // 速度達標後，回溯分析的時間窗口（秒）
     public float minDirectionDot = 0.8f;       // 方向判斷的餘弦閾值（0.8 ≈ 37度內）
@@ -70,12 +79,15 @@ public class ScratchRhythmGame : MonoBehaviour
     public TextMeshProUGUI calibrationText; // 校正提示文本
     
     [Header("Joy-Con 校正")]
-    public test joyConController; // Joy-Con 控制器腳本引用
+    public test joyConController; // Joy-Con 控制器腳本引用（主要手把）
+    public test joyConController2; // 第二個 Joy-Con 控制器腳本引用（選填）
+    public MultiSwitchControllerManager controllerManager; // 控制器管理器引用
     
     [Header("3D 飛行設置")]
     public Transform targets3DParent; // 3D 目標的父對象（場景中的空物件，非 Canvas）
     public Transform spawnPoint; // 物件發射點（遠方）
     public Transform targetPoint; // 物件目標點（鏡頭前方）
+    public float arcHeight = 2f; // 飛行拱高度
     public bool use3DMode = false; // 是否使用 3D 模式
 
     // 遊戲狀態
@@ -88,10 +100,19 @@ public class ScratchRhythmGame : MonoBehaviour
     private int currentStep = 0; // 當前步驟
     private int currentStepIndex = 0; // 當前等待完成的目標索引
     
-    // === 劃動檢測狀態（v3）===
-    private List<Vector2> positionHistory = new List<Vector2>();
-    private List<float> timeHistory = new List<float>();
-    private bool isSlashOnCooldown = false;
+    // === 劃動檢測狀態（v3）- 改為每個控制器獨立追蹤 ===
+    private class SlashDetectionState
+    {
+        public List<Vector2> positionHistory = new List<Vector2>();
+        public List<float> timeHistory = new List<float>();
+        public bool isSlashOnCooldown = false;
+        public float lastAccelCheckTime = 0f; // 上次加速度檢查時間
+    }
+    
+    private Dictionary<int, SlashDetectionState> slashStates = new Dictionary<int, SlashDetectionState>();
+    
+    // Joy-Con 控制器對應索引（用於多控制器追蹤）
+    private Dictionary<int, test> cursorToController = new Dictionary<int, test>();
     
     // 分數
     private int score = 0;
@@ -103,10 +124,10 @@ public class ScratchRhythmGame : MonoBehaviour
     private float lastSlashTime = -1f; // 上一次揮動完成時間（防止連續觸發）
     private float slashCooldown = 0.2f; // 揮動冷卻時間（秒）
     
-    // 方向枚舉
-    public enum SlashDirection { Left, Right, Up, Down }
+    // 方向枚舉（大野狼抓取動作）
+    public enum SlashDirection { Left, Right, DownLeft, DownRight }
     
-    void Start()
+    void OnEnable()
     {
         // 初始化音效組件
         audioSource = GetComponent<AudioSource>();
@@ -115,15 +136,61 @@ public class ScratchRhythmGame : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
         }
         
+        // 自動尋找震動管理器
+        if (vibrationManager == null)
+        {
+            vibrationManager = FindObjectOfType<VibrationManager>();
+            if (vibrationManager != null)
+            {
+                Debug.Log("[ScratchRhythmGame] 找到 VibrationManager");
+            }
+            else
+            {
+                Debug.LogWarning("[ScratchRhythmGame] 找不到 VibrationManager，震動功能將無法使用");
+            }
+        }
+
+        // 自動尋找視差背景管理器
+        if (parallaxManager == null)
+        {
+            parallaxManager = FindObjectOfType<ParallaxManager>();
+            if (parallaxManager != null)
+            {
+                Debug.Log("[ScratchRhythmGame] 找到 ParallaxManager");
+            }
+        }
+        
+        // 初始化每個光標的檢測狀態和控制器映射
+        if (cursors != null)
+        {
+            for (int i = 0; i < cursors.Length; i++)
+            {
+                if (cursors[i] != null)
+                {
+                    slashStates[i] = new SlashDetectionState();
+                    
+                    // 映射光標到對應的 Joy-Con 控制器
+                    if (i == 0 && joyConController != null)
+                    {
+                        cursorToController[i] = joyConController;
+                    }
+                    else if (i == 1 && joyConController2 != null)
+                    {
+                        cursorToController[i] = joyConController2;
+                    }
+                }
+            }
+        }
+        
         // 計算節拍間隔
         beatInterval = 60f / bpm;
         
-        // 檢查是否需要校正
-        if (joyConController != null && !joyConController.Calibrated && calijoycon)
+        // 檢查是否需要校正（只檢查已連接的手把）
+        if (calijoycon && !AreAllConnectedControllersCalibrated())
         {
             currentState = GameState.WaitingCalibration;
             ShowCalibrationPrompt();
-            Debug.Log("等待 Joy-Con 校正...");
+            Debug.Log("等待已連接的 Joy-Con 校正...");
             return;
         }
         
@@ -147,14 +214,23 @@ public class ScratchRhythmGame : MonoBehaviour
     
     void Update()
     {
+        // 檢查是否需要校正（無論什麼狀態，只要需要校正就切換）
+        if (calijoycon && !AreAllConnectedControllersCalibrated() && currentState != GameState.WaitingCalibration)
+        {
+            currentState = GameState.WaitingCalibration;
+            ShowCalibrationPrompt();
+            Debug.Log("[Update] 檢測到未校正的手把，進入校正模式");
+            return;
+        }
+
         // 等待校正狀態
         if (currentState == GameState.WaitingCalibration)
         {
-            // 檢查是否已完成校正
-            if (joyConController != null && joyConController.Calibrated)
+            // 檢查是否所有已連接的手把都已完成校正
+            if (AreAllConnectedControllersCalibrated())
             {
                 HideCalibrationPrompt();
-                Debug.Log("校正完成！開始遊戲");
+                Debug.Log("所有已連接的手把校正完成！開始遊戲");
                 
                 if (!debugMode)
                 {
@@ -184,13 +260,13 @@ public class ScratchRhythmGame : MonoBehaviour
             }
             else if (Input.GetKeyDown(debugUpKey))
             {
-                Debug.Log("[Debug] 生成上目標");
-                SpawnDebugTarget(SlashDirection.Up);
+                Debug.Log("[Debug] 生成左斜下目標");
+                SpawnDebugTarget(SlashDirection.DownLeft);
             }
             else if (Input.GetKeyDown(debugDownKey))
             {
-                Debug.Log("[Debug] 生成下目標");
-                SpawnDebugTarget(SlashDirection.Down);
+                Debug.Log("[Debug] 生成右斜下目標");
+                SpawnDebugTarget(SlashDirection.DownRight);
             }
             else if (Input.GetKeyDown(debugClearKey))
             {
@@ -232,16 +308,16 @@ public class ScratchRhythmGame : MonoBehaviour
                     if (currentTime >= deadlineTime)
                     {
                         target.isMissed = true;
-                        target.MarkAsFailed();
                         
-                        // 扣分
-                        int penalty = 50;
-                        score = Mathf.Max(0, score - penalty);
-                        combo = 0;
-                        ShowFeedback($"Miss! -{penalty}");
-                        UpdateUI();
-                        
-                        Debug.Log($"[Miss] 目標 #{i} ({target.direction}) 錯過！時間={currentTime:F2}, 死亡線={deadlineTime:F2}");
+                        // 呼叫統一的錯過處理方法（包含震動、VFX、HitStop）
+                        if (target is SlashTarget3D target3D)
+                        {
+                            OnMissedTarget3D(target3D);
+                        }
+                        else
+                        {
+                            OnMissedTarget(target);
+                        }
                     }
                 }
             }
@@ -264,7 +340,8 @@ public class ScratchRhythmGame : MonoBehaviour
                 }
             }
             
-            if (allProcessed)
+            // Debug 模式下不自動結束遊戲階段
+            if (allProcessed && !debugMode)
             {
                 OnGameplayPhaseEnd();
                 Debug.Log("[遊戲結束] 所有物件已處理完畢");
@@ -321,13 +398,13 @@ public class ScratchRhythmGame : MonoBehaviour
         }
     }
     
-    // 全螢幕揮動檢測（不需要碰到目標）
+    // 全螢幕揮動檢測（支援多個控制器）
     void DetectSlashInput()
     {
         if (activeTargets.Count == 0)
             return;
         
-        // ★ WASD 快速測試（模擬完成劃動）- 改為檢查飛行中的物件
+        // ★ WASD 快速測試（模擬完成劃動）
         SlashDirection? pressedDirection = null;
         
         if (Input.GetKeyDown(KeyCode.A)) // 左
@@ -340,15 +417,15 @@ public class ScratchRhythmGame : MonoBehaviour
             pressedDirection = SlashDirection.Right;
             Debug.Log("[測試] 按 D 鍵 - 模擬右劃");
         }
-        else if (Input.GetKeyDown(KeyCode.W)) // 上
+        else if (Input.GetKeyDown(KeyCode.W)) // 左斜下
         {
-            pressedDirection = SlashDirection.Up;
-            Debug.Log("[測試] 按 W 鍵 - 模擬上劃");
+            pressedDirection = SlashDirection.DownLeft;
+            Debug.Log("[測試] 按 W 鍵 - 模擬左斜下抓");
         }
-        else if (Input.GetKeyDown(KeyCode.S)) // 下
+        else if (Input.GetKeyDown(KeyCode.S)) // 右斜下
         {
-            pressedDirection = SlashDirection.Down;
-            Debug.Log("[測試] 按 S 鍵 - 模擬下劃");
+            pressedDirection = SlashDirection.DownRight;
+            Debug.Log("[測試] 按 S 鍵 - 模擬右斜下抓");
         }
         
         // 如果按了 WASD，檢查是否有匹配的飛行中物件
@@ -357,7 +434,6 @@ public class ScratchRhythmGame : MonoBehaviour
             SlashTarget targetToHit = FindFlyingTarget(pressedDirection.Value);
             if (targetToHit != null)
             {
-                // 模擬一個成功的劃動
                 OnSlashComplete(targetToHit, 150f, 0.3f); 
             }
             else
@@ -367,49 +443,78 @@ public class ScratchRhythmGame : MonoBehaviour
             return;
         }
         
-        // 如果按了 WASD，檢查是否有匹配的飛行中物件
-        if (pressedDirection.HasValue)
+        // === 檢測所有光標的劃動（多控制器支援，使用加速度檢測）===
+        if (cursors == null || cursors.Length == 0)
+            return;
+        
+        for (int cursorIndex = 0; cursorIndex < cursors.Length; cursorIndex++)
         {
-            SlashTarget targetToHit = FindFlyingTarget(pressedDirection.Value);
-            if (targetToHit != null)
+            if (cursors[cursorIndex] == null)
+                continue;
+            
+            // 確保該光標有檢測狀態
+            if (!slashStates.ContainsKey(cursorIndex))
+                slashStates[cursorIndex] = new SlashDetectionState();
+            
+            SlashDetectionState state = slashStates[cursorIndex];
+            
+            // 檢查冷卻時間
+            if (state.isSlashOnCooldown)
+                continue;
+            
+            Vector2 currentPos = cursors[cursorIndex].GetCursorPositionInCanvas();
+            float currentTime = Time.time;
+
+            // 記錄歷史數據（用於方向分析）
+            state.positionHistory.Add(currentPos);
+            state.timeHistory.Add(currentTime);
+
+            // 清理過舊的歷史數據
+            while (state.timeHistory.Count > 0 && currentTime - state.timeHistory[0] > 0.5f)
             {
-                OnSlashComplete(targetToHit, 150f, 0.3f);
+                state.timeHistory.RemoveAt(0);
+                state.positionHistory.RemoveAt(0);
+            }
+
+            // === 使用 Joy-Con 加速度檢測劃動觸發 ===
+            test controller = null;
+            if (cursorToController.ContainsKey(cursorIndex))
+            {
+                controller = cursorToController[cursorIndex];
+            }
+            
+            if (controller != null)
+            {
+                // 取得線性加速度（已去除重力）
+                Vector3 accel = controller.alinear;
+                float accelMagnitude = new Vector2(accel.x, accel.z).magnitude; // 只考慮水平方向
+                
+                // 檢查加速度是否達到閾值（避免頻繁觸發，加入時間間隔）
+                if (accelMagnitude >= minSlashAccel && currentTime - state.lastAccelCheckTime > 0.1f)
+                {
+                    state.lastAccelCheckTime = currentTime;
+                    Debug.Log($"[加速度觸發] 光標 {cursorIndex}: 加速度 = {accelMagnitude:F2}, 閾值 = {minSlashAccel}");
+                    AnalyzeRecentSlash(cursorIndex, currentTime);
+                }
             }
             else
             {
-                Debug.Log($"[測試] 沒有飛行中的 {pressedDirection.Value} 方向物件");
+                // 沒有控制器時回退到鼠標速度檢測（向下兼容）
+                if (state.positionHistory.Count < 2)
+                    continue;
+                
+                Vector2 lastPos = state.positionHistory[state.positionHistory.Count - 2];
+                float lastTime = state.timeHistory[state.timeHistory.Count - 2];
+                float deltaTime = currentTime - lastTime;
+                float speed = (deltaTime > 0) ? Vector2.Distance(currentPos, lastPos) / deltaTime : 0;
+
+                // 使用一個合理的預設速度閾值（當沒有 Joy-Con 時）
+                float fallbackSpeedThreshold = 1200f;
+                if (speed >= fallbackSpeedThreshold)
+                {
+                    AnalyzeRecentSlash(cursorIndex, currentTime);
+                }
             }
-            return;
-        }
-        
-        // === 新版劃動檢測邏輯 v3 ===
-        if (isSlashOnCooldown) return;
-
-        Vector2 currentPos = cursor.GetCursorPositionInCanvas();
-        float currentTime = Time.time;
-
-        // 記錄歷史數據
-        positionHistory.Add(currentPos);
-        timeHistory.Add(currentTime);
-
-        // 清理過舊的歷史數據
-        while (timeHistory.Count > 0 && currentTime - timeHistory[0] > 0.5f)
-        {
-            timeHistory.RemoveAt(0);
-            positionHistory.RemoveAt(0);
-        }
-
-        // 計算當前速度
-        if (positionHistory.Count < 2) return;
-        
-        Vector2 lastPos = positionHistory[positionHistory.Count - 2];
-        float lastTime = timeHistory[timeHistory.Count - 2];
-        float speed = (Time.deltaTime > 0) ? Vector2.Distance(currentPos, lastPos) / (currentTime - lastTime) : 0;
-
-        // 檢查速度是否達到閾值
-        if (speed >= minSlashSpeed)
-        {
-            AnalyzeRecentSlash(currentTime);
         }
     }
     
@@ -447,15 +552,20 @@ public class ScratchRhythmGame : MonoBehaviour
         return null;
     }
 
-    // === 新版劃動檢測核心方法 v3 ===
+    // === 新版劃動檢測核心方法 v3（多控制器版）===
 
-    void AnalyzeRecentSlash(float peakTime)
+    void AnalyzeRecentSlash(int cursorIndex, float peakTime)
     {
+        if (!slashStates.ContainsKey(cursorIndex))
+            return;
+        
+        SlashDetectionState state = slashStates[cursorIndex];
+        
         // 1. 找到分析窗口的起點
         int startIndex = -1;
-        for (int i = timeHistory.Count - 1; i >= 0; i--)
+        for (int i = state.timeHistory.Count - 1; i >= 0; i--)
         {
-            if (peakTime - timeHistory[i] <= slashAnalysisWindow)
+            if (peakTime - state.timeHistory[i] <= slashAnalysisWindow)
             {
                 startIndex = i;
             }
@@ -465,22 +575,22 @@ public class ScratchRhythmGame : MonoBehaviour
             }
         }
 
-        if (startIndex == -1 || timeHistory.Count - startIndex < 2)
+        if (startIndex == -1 || state.timeHistory.Count - startIndex < 2)
         {
-            Debug.Log("[Slash v3] ✗ 分析失敗：分析窗口內數據不足");
+            Debug.Log($"[Slash v3][控制器{cursorIndex}] ✗ 分析失敗：分析窗口內數據不足");
             return;
         }
 
         // 2. 獲取窗口內的起點和終點
-        Vector2 startPos = positionHistory[startIndex];
-        Vector2 endPos = positionHistory[positionHistory.Count - 1];
-        float slashTime = timeHistory[timeHistory.Count - 1] - timeHistory[startIndex];
+        Vector2 startPos = state.positionHistory[startIndex];
+        Vector2 endPos = state.positionHistory[state.positionHistory.Count - 1];
+        float slashTime = state.timeHistory[state.timeHistory.Count - 1] - state.timeHistory[startIndex];
         float slashDist = Vector2.Distance(startPos, endPos);
 
         // 3. 檢查距離
         if (slashDist < minSlashDistance)
         {
-            Debug.Log($"[Slash v3] ✗ 分析失敗：距離太短 ({slashDist:F1} < {minSlashDistance})");
+            Debug.Log($"[Slash v3][控制器{cursorIndex}] ✗ 分析失敗：距離太短 ({slashDist:F1} < {minSlashDistance})");
             return;
         }
 
@@ -490,7 +600,7 @@ public class ScratchRhythmGame : MonoBehaviour
 
         if (dir == (SlashDirection)(-1))
         {
-            Debug.Log($"[Slash v3] ✗ 分析失敗：方向不明確");
+            Debug.Log($"[Slash v3][控制器{cursorIndex}] ✗ 分析失敗：方向不明確");
             return;
         }
 
@@ -498,37 +608,63 @@ public class ScratchRhythmGame : MonoBehaviour
         SlashTarget target = FindFlyingTarget(dir);
         if (target == null)
         {
-            Debug.Log($"[Slash v3] ✓ 分析成功，但無匹配目標。方向={dir}");
+            Debug.Log($"[Slash v3][控制器{cursorIndex}] ✓ 分析成功，但無匹配目標。方向={dir}");
             return;
         }
 
         // 6. 成功！
-        Debug.Log($"[Slash v3] ✓✓✓ 成功！方向={dir}, 距離={slashDist:F1}, 時間={slashTime:F2}s");
-        OnSlashComplete(target, slashDist, slashTime);
-        StartCoroutine(SlashCooldown());
+        Debug.Log($"[Slash v3][控制器{cursorIndex}] ✓✓✓ 成功！方向={dir}, 距離={slashDist:F1}, 時間={slashTime:F2}s");
+        // 反轉控制器索引（cursorIndex 0 -> controllerIndex 1, cursorIndex 1 -> controllerIndex 0）
+        int controllerIndexForVibration = (cursorIndex == 0) ? 1 : 0;
+        OnSlashComplete(target, slashDist, slashTime, controllerIndexForVibration);
+        StartCoroutine(SlashCooldown(cursorIndex));
     }
     
-    IEnumerator SlashCooldown()
+    IEnumerator SlashCooldown(int cursorIndex)
     {
-        isSlashOnCooldown = true;
+        if (!slashStates.ContainsKey(cursorIndex))
+            yield break;
+        
+        SlashDetectionState state = slashStates[cursorIndex];
+        state.isSlashOnCooldown = true;
         // 清空歷史記錄，避免舊數據干擾
-        positionHistory.Clear();
-        timeHistory.Clear();
+        state.positionHistory.Clear();
+        state.timeHistory.Clear();
         yield return new WaitForSeconds(slashCooldown);
-        isSlashOnCooldown = false;
+        state.isSlashOnCooldown = false;
     }
 
-    // 方向檢測 (v3 版)
+    // 方向檢測 (v3 版 - 改為左右+斜下)
     SlashDirection DetectDirection(Vector2 vector)
     {
         if (vector.magnitude < 0.1f) return (SlashDirection)(-1);
         
         Vector2 normalized = vector.normalized;
         
-        if (Vector2.Dot(normalized, Vector2.right) > minDirectionDot) return SlashDirection.Right;
-        if (Vector2.Dot(normalized, Vector2.left) > minDirectionDot) return SlashDirection.Left;
-        if (Vector2.Dot(normalized, Vector2.up) > minDirectionDot) return SlashDirection.Up;
-        if (Vector2.Dot(normalized, Vector2.down) > minDirectionDot) return SlashDirection.Down;
+        // 定義四個方向向量
+        Vector2 right = Vector2.right;                          // 右 (1, 0)
+        Vector2 left = Vector2.left;                            // 左 (-1, 0)
+        Vector2 downLeft = new Vector2(-1, -1).normalized;      // 左斜下 (-0.707, -0.707)
+        Vector2 downRight = new Vector2(1, -1).normalized;      // 右斜下 (0.707, -0.707)
+        
+        // 計算與各方向的相似度
+        float dotRight = Vector2.Dot(normalized, right);
+        float dotLeft = Vector2.Dot(normalized, left);
+        float dotDownLeft = Vector2.Dot(normalized, downLeft);
+        float dotDownRight = Vector2.Dot(normalized, downRight);
+        
+        // 找出最匹配的方向
+        float maxDot = Mathf.Max(dotRight, dotLeft, dotDownLeft, dotDownRight);
+        
+        // 必須超過閾值才算有效
+        if (maxDot < minDirectionDot)
+            return (SlashDirection)(-1);
+        
+        // 返回最匹配的方向
+        if (maxDot == dotRight) return SlashDirection.Right;
+        if (maxDot == dotLeft) return SlashDirection.Left;
+        if (maxDot == dotDownLeft) return SlashDirection.DownLeft;
+        if (maxDot == dotDownRight) return SlashDirection.DownRight;
         
         return (SlashDirection)(-1);
     }
@@ -542,8 +678,8 @@ public class ScratchRhythmGame : MonoBehaviour
         {
             case SlashDirection.Right: return Vector2.right;
             case SlashDirection.Left: return Vector2.left;
-            case SlashDirection.Up: return Vector2.up;
-            case SlashDirection.Down: return Vector2.down;
+            case SlashDirection.DownLeft: return new Vector2(-1, -1).normalized;
+            case SlashDirection.DownRight: return new Vector2(1, -1).normalized;
             default: return Vector2.zero;
         }
     }
@@ -616,15 +752,17 @@ public class ScratchRhythmGame : MonoBehaviour
             targetObj = Instantiate(slashTargetPrefab, parent3D);
             
             // 設置初始位置
+            Vector3 offset = Vector3.zero;
             if (spawnPoint != null)
             {
                 Vector3 position = spawnPoint.position;
-                if (dir == SlashDirection.Up || dir == SlashDirection.Down)
-                {
-                    // 根據世界單位的偏移量來調整
-                    float worldOffsetX = targetXOffsetRange / 100f; // 將 Canvas 單位轉換為世界單位 (可調整)
-                    position.x += Random.Range(-worldOffsetX, worldOffsetX);
-                }
+                
+                // 加上隨機 X 偏移，避免生成在一條直線上
+                float worldOffsetX = targetXOffsetRange / 100f; // 將 Canvas 單位轉換為世界單位 (可調整)
+                float randomX = Random.Range(-worldOffsetX, worldOffsetX);
+                offset.x = randomX;
+                position.x += randomX;
+                
                 targetObj.transform.position = position;
             }
             
@@ -637,6 +775,8 @@ public class ScratchRhythmGame : MonoBehaviour
             target3D.spawnTime = Time.time;
             target3D.spawnPoint = spawnPoint;
             target3D.targetPoint = targetPoint;
+            target3D.targetOffset = offset; // 設置目標點偏移，保持平行飛行
+            target3D.arcHeight = arcHeight;
             
             // ★ 計算這個物件的間隔（是否要變奏）
             float thisInterval = beatInterval;
@@ -836,11 +976,11 @@ public class ScratchRhythmGame : MonoBehaviour
             case SlashDirection.Right:
                 basePos = new Vector2(200, 0);
                 break;
-            case SlashDirection.Up:
-                basePos = new Vector2(0, 200);
+            case SlashDirection.DownLeft:
+                basePos = new Vector2(-200, -200);
                 break;
-            case SlashDirection.Down:
-                basePos = new Vector2(0, -200);
+            case SlashDirection.DownRight:
+                basePos = new Vector2(200, -200);
                 break;
         }
         
@@ -888,11 +1028,11 @@ public class ScratchRhythmGame : MonoBehaviour
             case SlashDirection.Right:
                 basePos = new Vector2(200, 0);
                 break;
-            case SlashDirection.Up:
-                basePos = new Vector2(Random.Range(-targetXOffsetRange, targetXOffsetRange), 200);
+            case SlashDirection.DownLeft:
+                basePos = new Vector2(Random.Range(-targetXOffsetRange, targetXOffsetRange) - 200, -200);
                 break;
-            case SlashDirection.Down:
-                basePos = new Vector2(Random.Range(-targetXOffsetRange, targetXOffsetRange), -200);
+            case SlashDirection.DownRight:
+                basePos = new Vector2(Random.Range(-targetXOffsetRange, targetXOffsetRange) + 200, -200);
                 break;
         }
         
@@ -928,9 +1068,9 @@ public class ScratchRhythmGame : MonoBehaviour
     }
     
     // 劃動完成（全螢幕檢測）
-    void OnSlashComplete(SlashTarget target, float slashDistance, float slashTime)
+    void OnSlashComplete(SlashTarget target, float slashDistance, float slashTime, int controllerIndex = -1)
     {
-        Debug.Log($"[遊戲] 劃動完成：目標#{target.stepIndex}, 方向={target.direction}, 距離={slashDistance:F1}, 時間={slashTime:F2}s");
+        Debug.Log($"[遊戲] 劃動完成：目標#{target.stepIndex}, 方向={target.direction}, 距離={slashDistance:F1}, 時間={slashTime:F2}s, 控制器={controllerIndex}");
         
         float currentTime = Time.time;
         
@@ -978,21 +1118,53 @@ public class ScratchRhythmGame : MonoBehaviour
                 rating = "Perfect!!";
                 points = 300;
                 soundToPlay = perfectSound != null ? perfectSound : hitSound;
+                
+                // 觸發 Perfect 震動（僅震動擊中的控制器）
+                if (vibrationManager != null)
+                {
+                    Debug.Log($"[震動] 觸發 Perfect Hit 震動 - 控制器 {controllerIndex}");
+                    vibrationManager.VibrateOnPerfectHit(controllerIndex);
+                }
+                else
+                {
+                    Debug.LogWarning("[震動] vibrationManager 為 null，無法震動");
+                }
             }
             else if (timingOffset <= greatWindow)
             {
                 rating = "Great!";
                 points = 200;
+                
+                // 觸發 Great 震動（僅震動擊中的控制器）
+                if (vibrationManager != null)
+                {
+                    Debug.Log($"[震動] 觸發 Great Hit 震動 - 控制器 {controllerIndex}");
+                    vibrationManager.VibrateOnGreatHit(controllerIndex);
+                }
             }
             else if (timingOffset <= goodWindow)
             {
                 rating = "Good";
                 points = 100;
+                
+                // 觸發 Good 震動（僅震動擊中的控制器）
+                if (vibrationManager != null)
+                {
+                    Debug.Log($"[震動] 觸發 Good Hit 震動 - 控制器 {controllerIndex}");
+                    vibrationManager.VibrateOnGoodHit(controllerIndex);
+                }
             }
             else
             {
                 rating = "OK";
                 points = 50;
+                
+                // 觸發 Good 震動（僅震動擊中的控制器，OK 使用 Good 的震動）
+                if (vibrationManager != null)
+                {
+                    Debug.Log($"[震動] 觸發 OK (Good) 震動 - 控制器 {controllerIndex}");
+                    vibrationManager.VibrateOnGoodHit(controllerIndex);
+                }
             }
             
             Debug.Log($"[遊戲] 間隔判定：玩家間隔={playerInterval:F3}s, 理想間隔={idealInterval:F3}s, 差距={timingOffset:F3}s");
@@ -1015,10 +1187,33 @@ public class ScratchRhythmGame : MonoBehaviour
         ShowFeedback($"{rating} x{combo}");
         UpdateUI();
         
-        // 重置光標到 (0, 0)
-        if (cursor != null)
+        // ★ 播放劃痕 VFX（根據劃動方向）
+        if (vfxManager != null)
         {
-            // cursor.ResetToOrigin();
+            Vector3 vfxPosition = target.GetPosition();
+            Debug.Log($"[遊戲] 準備播放 VFX：方向={target.direction}, 位置={vfxPosition}");
+            
+            // 根據目標的方向生成對應的劃痕 VFX
+            vfxManager.SpawnSlashVFX(target.direction, vfxPosition);
+            
+            // 每 10 連擊播放特殊特效
+            vfxManager.SpawnComboVFX(combo, vfxPosition);
+        }
+        else
+        {
+            Debug.LogWarning("[遊戲] VFX Manager 為 null！請在 Inspector 中設置 VFX Manager。");
+        }
+        
+        // 重置所有光標到 (0, 0)
+        if (cursors != null)
+        {
+            foreach (var cursor in cursors)
+            {
+                if (cursor != null)
+                {
+                    // cursor.ResetToOrigin();
+                }
+            }
         }
         
         Debug.Log($"[遊戲] ✓ 成功！評分={rating}, 得分={points}x{combo}={points*combo}, 已擊中數={hitCount}");
@@ -1046,11 +1241,25 @@ public class ScratchRhythmGame : MonoBehaviour
         ShowFeedback($"Miss! -{penalty}");
         UpdateUI();
         
-        Debug.Log($"[Miss] 目標 #{target.stepIndex} ({target.direction}) 錯過，扣 {penalty} 分，Combo 重置");
+        // ★ 播放錯過 VFX
+        if (vfxManager != null)
+        {
+            vfxManager.SpawnMissVFX(target.GetPosition());
+        }
         
-        // TODO: 後續可添加
-        // - Joy-Con 震動
-        // - 畫面扭曲/色彩失真效果
+        // 觸發 Miss 震動
+        if (vibrationManager != null)
+        {
+            vibrationManager.VibrateOnMiss();
+        }
+
+        // 觸發被打到時的停止效果
+        if (parallaxManager != null)
+        {
+            parallaxManager.TriggerHitStop();
+        }
+        
+        Debug.Log($"[Miss] 目標 #{target.stepIndex} ({target.direction}) 錯過，扣 {penalty} 分，Combo 重置");
     }
     
     // 3D 目標錯過處理
@@ -1067,6 +1276,24 @@ public class ScratchRhythmGame : MonoBehaviour
         
         ShowFeedback($"Miss! -{penalty}");
         UpdateUI();
+        
+        // ★ 播放錯過 VFX
+        if (vfxManager != null)
+        {
+            vfxManager.SpawnMissVFX(target.GetPosition());
+        }
+        
+        // 觸發 Miss 震動
+        if (vibrationManager != null)
+        {
+            vibrationManager.VibrateOnMiss();
+        }
+
+        // 觸發被打到時的停止效果
+        if (parallaxManager != null)
+        {
+            parallaxManager.TriggerHitStop();
+        }
         
         Debug.Log($"[Miss 3D] 目標 #{target.stepIndex} ({target.direction}) 錯過，扣 {penalty} 分，Combo 重置");
     }
@@ -1156,7 +1383,19 @@ public class ScratchRhythmGame : MonoBehaviour
     {
         if (calibrationText != null)
         {
-            calibrationText.text = "請按 B 鍵進行 Joy-Con 校正";
+            // 根據已連接的手把數量顯示不同提示
+            int connectedCount = GetConnectedControllerCount();
+            List<string> uncalibratedNames = GetUncalibratedControllerNames();
+            
+            if (uncalibratedNames.Count > 0)
+            {
+                calibrationText.text = $"請按 B 鍵校正以下手把:\n{string.Join(", ", uncalibratedNames)}";
+            }
+            else
+            {
+                calibrationText.text = "請按 B 鍵進行 Joy-Con 校正";
+            }
+            
             calibrationText.gameObject.SetActive(true);
         }
         
@@ -1169,6 +1408,85 @@ public class ScratchRhythmGame : MonoBehaviour
             feedbackText.gameObject.SetActive(false);
         if (flyingTimerText != null)
             flyingTimerText.gameObject.SetActive(false);
+    }
+    
+    /// <summary>
+    /// 檢查所有已連接的手把是否都已校正
+    /// </summary>
+    bool AreAllConnectedControllersCalibrated()
+    {
+        bool allCalibrated = true;
+        
+        // 檢查第一個手把（如果已連接）
+        if (IsControllerConnected(joyConController))
+        {
+            if (!joyConController.Calibrated)
+            {
+                Debug.Log($"手把 1 ({joyConController.name}) 尚未校正");
+                allCalibrated = false;
+            }
+        }
+        
+        // 檢查第二個手把（如果已連接）
+        if (IsControllerConnected(joyConController2))
+        {
+            if (!joyConController2.Calibrated)
+            {
+                Debug.Log($"手把 2 ({joyConController2.name}) 尚未校正");
+                allCalibrated = false;
+            }
+        }
+        
+        return allCalibrated;
+    }
+    
+    /// <summary>
+    /// 檢查控制器是否已連接
+    /// </summary>
+    bool IsControllerConnected(test controller)
+    {
+        if (controller == null)
+            return false;
+        
+        // 透過 controllerManager 檢查該控制器索引是否有連接
+        if (controllerManager != null)
+        {
+            return controllerManager.HasController(controller.controllerIndex);
+        }
+        
+        // 如果沒有 manager，假設只要 controller 存在就是連接的
+        return true;
+    }
+    
+    /// <summary>
+    /// 取得已連接的手把數量
+    /// </summary>
+    int GetConnectedControllerCount()
+    {
+        int count = 0;
+        if (IsControllerConnected(joyConController)) count++;
+        if (IsControllerConnected(joyConController2)) count++;
+        return count;
+    }
+    
+    /// <summary>
+    /// 取得未校正的手把名稱列表
+    /// </summary>
+    List<string> GetUncalibratedControllerNames()
+    {
+        List<string> names = new List<string>();
+        
+        if (IsControllerConnected(joyConController) && !joyConController.Calibrated)
+        {
+            names.Add($"手把1 (索引 {joyConController.controllerIndex})");
+        }
+        
+        if (IsControllerConnected(joyConController2) && !joyConController2.Calibrated)
+        {
+            names.Add($"手把2 (索引 {joyConController2.controllerIndex})");
+        }
+        
+        return names;
     }
     
     // 隱藏校正提示
@@ -1193,8 +1511,8 @@ public class ScratchRhythmGame : MonoBehaviour
         {
             case SlashDirection.Left: return "←";
             case SlashDirection.Right: return "→";
-            case SlashDirection.Up: return "↑";
-            case SlashDirection.Down: return "↓";
+            case SlashDirection.DownLeft: return "↙";
+            case SlashDirection.DownRight: return "↘";
             default: return "?";
         }
     }
@@ -1204,6 +1522,9 @@ public class ScratchRhythmGame : MonoBehaviour
     // 生成單個 Debug 目標
     void SpawnDebugTarget(SlashDirection direction)
     {
+        // 確保在遊戲階段，這樣 Update 才會處理飛行和判定
+        isInGameplayPhase = true;
+        
         GameObject targetObj;
         
         if (use3DMode)
@@ -1215,12 +1536,11 @@ public class ScratchRhythmGame : MonoBehaviour
             if (spawnPoint != null)
             {
                 Vector3 position = spawnPoint.position;
-                if (direction == SlashDirection.Up || direction == SlashDirection.Down)
-                {
-                    // 根據世界單位的偏移量來調整
-                    float worldOffsetX = targetXOffsetRange / 100f; // 將 Canvas 單位轉換為世界單位 (可調整)
-                    position.x += Random.Range(-worldOffsetX, worldOffsetX);
-                }
+                
+                // 加上隨機 X 偏移，避免生成在一條直線上
+                float worldOffsetX = targetXOffsetRange / 100f; // 將 Canvas 單位轉換為世界單位 (可調整)
+                position.x += Random.Range(-worldOffsetX, worldOffsetX);
+                
                 targetObj.transform.position = position;
             }
             
@@ -1237,6 +1557,7 @@ public class ScratchRhythmGame : MonoBehaviour
             target3D.customInterval = beatInterval;
             target3D.flyingStartTime = Time.time;
             target3D.flyingDuration = flyingDuration;
+            target3D.arcHeight = arcHeight;
             target3D.Initialize();
             
             // 加入統一目標列表
@@ -1260,12 +1581,21 @@ public class ScratchRhythmGame : MonoBehaviour
                 
             target.direction = direction;
             target.stepIndex = activeTargets.Count;
+            target.spawnTime = Time.time;
+            
+            // Debug 模式下，讓它像遊戲階段一樣運作
+            target.hasPlayedJudgmentBeat = false; // 讓它播放音效
+            target.customInterval = beatInterval;
+            target.flyingStartTime = Time.time;
+            target.flyingDuration = flyingDuration;
+            target.idealHitTime = 0f; // 不使用理想擊打時間，而是用飛行時間
+            
             target.SetDirectionText(GetDirectionSymbol(direction) + (activeTargets.Count + 1));
             target.Initialize();
             
             activeTargets.Add(target);
             
-            Debug.Log($"[Debug 2D] 已生成目標 #{activeTargets.Count - 1}: {direction}, 位置={position}");
+            Debug.Log($"[Debug 2D] 已生成目標 #{activeTargets.Count - 1}: {direction}, 位置={position}, 飛行時間={flyingDuration}s");
         }
     }
     
@@ -1278,10 +1608,10 @@ public class ScratchRhythmGame : MonoBehaviour
                 return new Vector2(-200, 0);
             case SlashDirection.Right:
                 return new Vector2(200, 0);
-            case SlashDirection.Up:
-                return new Vector2(0, 200);
-            case SlashDirection.Down:
-                return new Vector2(0, -200);
+            case SlashDirection.DownLeft:
+                return new Vector2(-200, -200);
+            case SlashDirection.DownRight:
+                return new Vector2(200, -200);
             default:
                 return Vector2.zero;
         }

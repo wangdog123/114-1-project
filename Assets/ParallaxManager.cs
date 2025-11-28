@@ -1,5 +1,7 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Rendering;
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -16,10 +18,54 @@ public class ParallaxManager : MonoBehaviour
     [Range(0, 100)]
     public float stopDistancePercent = 80f; // Percentage of the Z-axis distance to travel. 80% means stopping with 20% distance remaining.
     public bool moveOnStart = false;
+    public bool started = false;
+    // Exposed for external UI: start and final Z positions for the camera move
+    [HideInInspector]
+    public float cameraMoveStartZ = 0f;
+    [HideInInspector]
+    public float cameraMoveFinalZ = 0f;
 
     [Header("Dynamic Scaling")]
     [Range(0, 1)]
     public float dynamicScaleFactor = 0.1f; // How much the scale changes based on distance. 0 = no change, 1 = full dynamic scaling.
+
+    [Header("Head Bob & Footsteps")]
+    public bool enableHeadBob = true;
+    public float bobFrequency = 6f;      // 晃動頻率（腳步速度）
+    public float bobAmplitude = 0.05f;   // 晃動幅度
+    public bool enableFootsteps = true;
+    public System.Collections.Generic.List<AudioClip> footstepSounds; // 腳步聲音效列表
+    [Range(0f, 1f)] public float footstepVolume = 0.5f;
+
+    [Header("Hit Stop Settings")]
+    public float hitStopDuration = 0.5f; // 被打到時停止的時間
+    private float currentHitStopTimer = 0f;
+
+    private float bobTimer = 0f;
+    private bool stepPlayed = false;
+    private AudioSource footstepAudioSource;
+    private Volume dizzyVolume;
+    [Header("--- 暈眩效果設定 ---")]
+    [Tooltip("暈眩持續時間 (秒)")]
+    public float dizzyDuration = 2.0f;
+
+    [Tooltip("整體晃動速度 (頻率)：數值越高晃得越快")]
+    public float dizzySpeed = 0.8f;
+
+    [Header("--- 晃動強度設定 (角度) ---")]
+    [Tooltip("X軸晃動強度 (上下看)：模擬點頭/抬頭的晃動幅度")]
+    public float dizzyStrengthX = 8.0f;
+
+    [Tooltip("Y軸晃動強度 (左右看)：模擬搖頭的晃動幅度")]
+    public float dizzyStrengthY = 5.0f;
+
+    [Header("--- 其他設定 ---")]
+    [Tooltip("淡入時間 (秒)")]
+    public float fadeInDuration = 0.2f;
+    [Tooltip("結束後的恢復時間 (秒)")]
+    public float recoveryDuration = 0.5f;
+    [Tooltip("暈眩圓周振幅的小型隨機抖動 (度數)，用於避免完全固定但不改變主要幅度)")]
+    public float amplitudeJitter = 0.3f;
 
     // Store initial scales and distances for each layer
     private Vector3[] _initialScales;
@@ -27,6 +73,7 @@ public class ParallaxManager : MonoBehaviour
     private bool _isInitialized = false;
 
     private Coroutine _cameraMoveCoroutine;
+    private bool isDizzy = false; // 是否正在暈眩中
 
 #if UNITY_EDITOR
     // Editor-only variables for camera movement
@@ -38,6 +85,7 @@ public class ParallaxManager : MonoBehaviour
     // For tracking layer changes in editor
     private Vector3[] _lastLayerPositions;
     private Vector3[] _lastLayerScales;
+    private TimeUIController timeUIController;
 
 
     void OnEnable()
@@ -45,6 +93,7 @@ public class ParallaxManager : MonoBehaviour
         // Subscribe to the editor update loop
         EditorApplication.update += EditorUpdate;
         InitializeLastLayerStates();
+        timeUIController = FindObjectOfType<TimeUIController>();
     }
 
     void OnDisable()
@@ -67,6 +116,7 @@ public class ParallaxManager : MonoBehaviour
                 // Don't track scale changes since we control them dynamically
             }
         }
+        dizzyVolume = FindObjectOfType<Volume>();
     }
 
     private bool HaveLayersChanged()
@@ -181,12 +231,18 @@ public class ParallaxManager : MonoBehaviour
         {
             cam = Camera.main;
         }
+        
+        footstepAudioSource = GetComponent<AudioSource>();
+        if (footstepAudioSource == null)
+            footstepAudioSource = gameObject.AddComponent<AudioSource>();
+            
         InitializeParallax();
 
         if (Application.isPlaying && moveOnStart)
         {
             StartCameraMove();
         }
+        
     }
 
     void Update()
@@ -201,6 +257,20 @@ public class ParallaxManager : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.M))
         {
             StartCameraMove();
+        }
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            // Reset camera position to the start position
+            if (cam != null)
+            {
+                cam.transform.position = Vector3.zero;
+                started = false;
+                timeUIController.initialize();
+                timeUIController.sliderTimeline.time = 0;
+                timeUIController.sliderTimeline.Evaluate();
+                timeUIController.sliderTimeline.Stop();
+                Debug.Log("Camera position reset to start.");
+            }
         }
     }
 
@@ -221,10 +291,16 @@ public class ParallaxManager : MonoBehaviour
             return;
         }
 
+        // Mark that the camera movement has started
+        started = true;
+
         // Calculate the final destination with the percentage-based Z offset
         Vector3 startPosition = cam.transform.position;
         Vector3 targetPosition = cameraTargetTransform.position;
         float finalZ = startPosition.z + (targetPosition.z - startPosition.z) * (stopDistancePercent / 100f);
+        // store start and final Z for external usage (e.g., UI sliders)
+        cameraMoveStartZ = startPosition.z;
+        cameraMoveFinalZ = finalZ;
         Vector3 finalTargetPosition = new Vector3(targetPosition.x, targetPosition.y, finalZ);
 
         // If a move is already in progress, stop it first.
@@ -235,28 +311,206 @@ public class ParallaxManager : MonoBehaviour
         _cameraMoveCoroutine = StartCoroutine(MoveCameraCoroutine(finalTargetPosition, cameraMoveDuration));
     }
 
+    /// <summary>
+    /// 觸發被打到時的停止效果
+    /// </summary>
+    public void TriggerHitStop()
+    {
+        if (!Application.isPlaying)
+        {
+            Debug.LogWarning("Hit Stop can only be triggered in Play Mode.");
+            return;
+        }
+
+        // 如果正在暈眩中，忽略新的 Hit Stop
+        if (isDizzy)
+            return;
+
+        Debug.Log("[ParallaxManager] 觸發 Hit Stop - 開始暈眩效果");
+
+        // 設置暈眩狀態（不停止相機移動協程，讓它自己處理）
+        isDizzy = true;
+
+        // 開始暈眩效果
+        StartCoroutine(DizzyEffect());
+    }
+
+    /// <summary>
+    /// 暈眩效果協程 - 讓鏡頭畫圈模擬暈眩感
+    /// </summary>
+    private IEnumerator DizzyEffect()
+    {
+        // 1. 紀錄原始旋轉角度
+        Quaternion originalRotation = cam.transform.rotation;
+        Vector3 originalEuler = originalRotation.eulerAngles;
+
+        float startTime = Time.time;
+        
+        Debug.Log($"[ParallaxManager] 開始暈眩 (速度:{dizzySpeed}, X強度:{dizzyStrengthX}, Y強度:{dizzyStrengthY})");
+
+        // ================= 階段一：暈眩晃動 =================
+        while (Time.time - startTime < dizzyDuration)
+        {
+            float elapsed = Time.time - startTime;
+            
+            // 計算淡入強度 (0 ~ 1)，讓暈眩有個開始的過程
+            float masterIntensity = Mathf.Clamp01(elapsed / fadeInDuration);
+
+            // 更新後處理權重
+            if (dizzyVolume != null) dizzyVolume.weight = masterIntensity;
+
+            // 使用穩定的圓周旋轉 (sin/cos) 映射到角度 (pitch/yaw)，並只加入小型的
+            // additive jitter 而不會改變主要振幅，確保整體幅度穩定一致。
+            float baseAngleSpeed = dizzySpeed; // 角速度基礎（rad/s）
+            // 累積角度驅動圓周運動
+            float baseAngle = Time.time * baseAngleSpeed;
+
+            // 穩定振幅 (不受噪聲大幅影響)
+            float ampX = dizzyStrengthX * masterIntensity;
+            float ampY = dizzyStrengthY * masterIntensity;
+
+            // 圓周運動映射到角度
+            float rotX = Mathf.Sin(baseAngle) * ampX;
+            float rotY = Mathf.Cos(baseAngle) * ampY;
+
+            // 小型 additive jitter (不要放大振幅，只作微調)
+            float jitterX = (Mathf.PerlinNoise(Time.time * 1.1f, 0f) - 0.5f) * 2f * amplitudeJitter;
+            float jitterY = (Mathf.PerlinNoise(0f, Time.time * 1.3f) - 0.5f) * 2f * amplitudeJitter;
+
+            // 應用到 camera（保留 Z 不變）
+            cam.transform.rotation = Quaternion.Euler(
+                originalEuler.x + rotX + jitterX,
+                originalEuler.y + rotY + jitterY,
+                originalEuler.z
+            );
+
+            yield return null;
+        }
+
+        // ================= 階段二：平滑恢復 =================
+        Debug.Log("[ParallaxManager] 暈眩結束，開始回正...");
+        
+        float recoveryStart = Time.time;
+        Quaternion endDizzyRot = cam.transform.rotation; // 記住暈眩最後一刻的角度
+        float startVolumeWeight = (dizzyVolume != null) ? dizzyVolume.weight : 0f;
+
+        while (Time.time - recoveryStart < recoveryDuration)
+        {
+            float t = (Time.time - recoveryStart) / recoveryDuration;
+            
+            // 使用 SmoothStep (S型曲線) 讓回正過程頭尾慢、中間快，比較自然
+            t = Mathf.SmoothStep(0f, 1f, t); 
+
+            // 使用 Slerp 平滑轉回原始角度
+            cam.transform.rotation = Quaternion.Slerp(endDizzyRot, originalRotation, t);
+
+            // 淡出 Volume
+            if (dizzyVolume != null)
+                dizzyVolume.weight = Mathf.Lerp(startVolumeWeight, 0f, t);
+
+            yield return null;
+        }
+
+        // ================= 階段三：確保歸位 =================
+        if (dizzyVolume != null) dizzyVolume.weight = 0.0f;
+        cam.transform.rotation = originalRotation;
+        isDizzy = false;
+        
+        Debug.Log("[ParallaxManager] 視線完全恢復");
+    }
+
     private IEnumerator MoveCameraCoroutine(Vector3 targetPosition, float duration)
     {
         if (cam == null) yield break;
 
         float elapsedTime = 0f;
+        float movementProgressTime = 0f; // 追蹤實際移動的時間進度
         Vector3 startingPosition = cam.transform.position;
+        
+        // Reset bob timer
+        bobTimer = 0f;
+        stepPlayed = false;
+        currentHitStopTimer = 0f;
 
         while (elapsedTime < duration)
         {
-            // Use Lerp to interpolate the position
-            cam.transform.position = Vector3.Lerp(startingPosition, targetPosition, elapsedTime / duration);
-            
-            // Increment the elapsed time
+            // 總時間總是流逝 (維持總時長不變)
             elapsedTime += Time.deltaTime;
+
+            if (isDizzy)
+            {
+                // 暈眩中：不增加移動進度，不更新位置，但總時間繼續計算
+                // 這樣最終會因為 movementProgressTime < duration 而到不了終點
+            }
+            else
+            {
+                // 只有沒暈眩時才增加移動進度
+                movementProgressTime += Time.deltaTime;
+
+                // 使用 movementProgressTime 來計算位置
+                // 這樣如果中間有停頓，最終位置就會不到達終點 (movementProgressTime < duration)
+                Vector3 currentPos = Vector3.Lerp(startingPosition, targetPosition, movementProgressTime / duration);
+                
+                // Apply Head Bob
+                if (enableHeadBob)
+                {
+                    bobTimer += Time.deltaTime * bobFrequency;
+                    float bobOffset = Mathf.Sin(bobTimer) * bobAmplitude;
+                    currentPos.y += bobOffset;
+                    
+                    // Handle Footsteps
+                    if (enableFootsteps)
+                    {
+                        HandleFootsteps();
+                    }
+                }
+                
+                cam.transform.position = currentPos;
+            }
             
             // Wait for the next frame
             yield return null;
         }
 
-        // Ensure the camera reaches the exact target position at the end
-        cam.transform.position = targetPosition;
+        // 時間到，結束移動。
+        // 注意：不強制設定為 targetPosition，因為如果中間有暈眩，玩家應該到不了終點。
         _cameraMoveCoroutine = null;
+    }
+    
+    private void HandleFootsteps()
+    {
+        if (footstepSounds == null || footstepSounds.Count == 0) return;
+
+        // 當 Sin 波接近谷底 (-1) 時播放腳步聲
+        float cyclePos = Mathf.Sin(bobTimer);
+        
+        // 閾值設為 -0.9，表示接近最低點（腳步落地）
+        if (cyclePos < -0.9f && !stepPlayed)
+        {
+            PlayFootstep();
+            stepPlayed = true;
+        }
+        // 當波形回升超過 -0.5 時重置標記，準備下一次腳步
+        else if (cyclePos > -0.5f)
+        {
+            stepPlayed = false;
+        }
+    }
+
+    private void PlayFootstep()
+    {
+        if (footstepSounds.Count == 0) return;
+        
+        // 隨機選擇一個腳步聲
+        int index = Random.Range(0, footstepSounds.Count);
+        AudioClip clip = footstepSounds[index];
+        
+        if (clip != null && footstepAudioSource != null)
+        {
+            // 稍微隨機化音高，增加自然感
+            footstepAudioSource.pitch = Random.Range(0.9f, 1.1f);
+            footstepAudioSource.PlayOneShot(clip, footstepVolume);
+        }
     }
 
     void OnValidate()
