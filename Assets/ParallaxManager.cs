@@ -18,6 +18,12 @@ public class ParallaxManager : MonoBehaviour
     [Range(0, 100)]
     public float stopDistancePercent = 80f; // Percentage of the Z-axis distance to travel. 80% means stopping with 20% distance remaining.
     public bool moveOnStart = false;
+    public bool started = false;
+    // Exposed for external UI: start and final Z positions for the camera move
+    [HideInInspector]
+    public float cameraMoveStartZ = 0f;
+    [HideInInspector]
+    public float cameraMoveFinalZ = 0f;
 
     [Header("Dynamic Scaling")]
     [Range(0, 1)]
@@ -79,7 +85,7 @@ public class ParallaxManager : MonoBehaviour
     // For tracking layer changes in editor
     private Vector3[] _lastLayerPositions;
     private Vector3[] _lastLayerScales;
-
+    private TimeUIController timeUIController;
 
 
     void OnEnable()
@@ -87,6 +93,7 @@ public class ParallaxManager : MonoBehaviour
         // Subscribe to the editor update loop
         EditorApplication.update += EditorUpdate;
         InitializeLastLayerStates();
+        timeUIController = FindObjectOfType<TimeUIController>();
     }
 
     void OnDisable()
@@ -235,6 +242,7 @@ public class ParallaxManager : MonoBehaviour
         {
             StartCameraMove();
         }
+        
     }
 
     void Update()
@@ -255,7 +263,12 @@ public class ParallaxManager : MonoBehaviour
             // Reset camera position to the start position
             if (cam != null)
             {
-                cam.transform.position = new Vector3(cam.transform.position.x, cam.transform.position.y, 0f);
+                cam.transform.position = Vector3.zero;
+                started = false;
+                timeUIController.initialize();
+                timeUIController.sliderTimeline.time = 0;
+                timeUIController.sliderTimeline.Evaluate();
+                timeUIController.sliderTimeline.Stop();
                 Debug.Log("Camera position reset to start.");
             }
         }
@@ -278,10 +291,16 @@ public class ParallaxManager : MonoBehaviour
             return;
         }
 
+        // Mark that the camera movement has started
+        started = true;
+
         // Calculate the final destination with the percentage-based Z offset
         Vector3 startPosition = cam.transform.position;
         Vector3 targetPosition = cameraTargetTransform.position;
         float finalZ = startPosition.z + (targetPosition.z - startPosition.z) * (stopDistancePercent / 100f);
+        // store start and final Z for external usage (e.g., UI sliders)
+        cameraMoveStartZ = startPosition.z;
+        cameraMoveFinalZ = finalZ;
         Vector3 finalTargetPosition = new Vector3(targetPosition.x, targetPosition.y, finalZ);
 
         // If a move is already in progress, stop it first.
