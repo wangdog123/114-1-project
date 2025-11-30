@@ -9,11 +9,11 @@ public class PressAnyButtonLoader : MonoBehaviour
 
     void Update()
     {
-        // 空白鍵 or 任意 joystick 鍵
-        if (IsJoystickPressed() || Input.anyKeyDown)
-        {
-            TransitionController.Instance.ChangeScene(nextSceneName);
-        }
+        // // 空白鍵 or 任意 joystick 鍵
+        // if (IsJoystickPressed() || Input.anyKeyDown)
+        // {
+        //     TransitionController.Instance.ChangeScene(nextSceneName);
+        // }
     }
 
     bool IsJoystickPressed()
