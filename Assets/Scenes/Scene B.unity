@@ -1848,7 +1848,7 @@ MonoBehaviour:
   prologueUI: {fileID: 0}
   tutorialUI: {fileID: 486581900}
   gameplayUI: {fileID: 1351572149}
-  scoreUI: []
+  scoreUI: {fileID: 0}
   goodEndingUI: {fileID: 0}
   badEndingUI: {fileID: 0}
   loadingUI: {fileID: 1839647781}
@@ -3587,7 +3587,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 113
+  m_SortingOrder: 1
   m_TargetDisplay: 0
 --- !u!224 &1010636550
 RectTransform:
