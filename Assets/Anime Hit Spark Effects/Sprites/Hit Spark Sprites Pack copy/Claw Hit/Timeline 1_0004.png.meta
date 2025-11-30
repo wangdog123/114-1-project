@@ -1,0 +1,871 @@
+fileFormatVersion: 2
+guid: 2ac155420b51f4bd5a8a9bbd95e115b4
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 2767827736144089870
+    second: Timeline 1_0004_0
+  - first:
+      213: -1892104506304078523
+    second: Timeline 1_0004_1
+  - first:
+      213: -4760426021964991705
+    second: Timeline 1_0004_2
+  - first:
+      213: -182174715852912571
+    second: Timeline 1_0004_3
+  - first:
+      213: -1365259871173204563
+    second: Timeline 1_0004_4
+  - first:
+      213: -5998885313550933550
+    second: Timeline 1_0004_5
+  - first:
+      213: 2748623116454216458
+    second: Timeline 1_0004_6
+  - first:
+      213: -4951799041520168077
+    second: Timeline 1_0004_7
+  - first:
+      213: 4361300688894182974
+    second: Timeline 1_0004_8
+  - first:
+      213: -6399357144892637667
+    second: Timeline 1_0004_9
+  - first:
+      213: 1890030682599306156
+    second: Timeline 1_0004_10
+  - first:
+      213: -6105379726205085945
+    second: Timeline 1_0004_11
+  - first:
+      213: 1727035900641722717
+    second: Timeline 1_0004_12
+  - first:
+      213: -3688815054703366935
+    second: Timeline 1_0004_13
+  - first:
+      213: -90381282297165328
+    second: Timeline 1_0004_14
+  - first:
+      213: -186294137589249440
+    second: Timeline 1_0004_15
+  - first:
+      213: -4084886316417254909
+    second: Timeline 1_0004_16
+  - first:
+      213: 4277404886280676183
+    second: Timeline 1_0004_17
+  - first:
+      213: -3972972259869716764
+    second: Timeline 1_0004_18
+  - first:
+      213: 2588452332817817658
+    second: Timeline 1_0004_19
+  - first:
+      213: -2574476067345931415
+    second: Timeline 1_0004_20
+  - first:
+      213: -538575439466281427
+    second: Timeline 1_0004_21
+  - first:
+      213: -961798620029722748
+    second: Timeline 1_0004_22
+  - first:
+      213: -4147124238931798897
+    second: Timeline 1_0004_23
+  - first:
+      213: 8447206529365148165
+    second: Timeline 1_0004_24
+  - first:
+      213: -2543802462834932077
+    second: Timeline 1_0004_25
+  - first:
+      213: -4722943895566582196
+    second: Timeline 1_0004_26
+  - first:
+      213: 8065196364200891399
+    second: Timeline 1_0004_27
+  - first:
+      213: 7274158497419484564
+    second: Timeline 1_0004_28
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 1
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 100
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: Timeline 1_0004_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 1024
+        height: 1024
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e03975459ac496620800000000000000
+      internalID: 2767827736144089870
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_1
+      rect:
+        serializedVersion: 2
+        x: 256
+        y: 322
+        width: 341
+        height: 484
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 54d54dfe9f4edb5e0800000000000000
+      internalID: -1892104506304078523
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_2
+      rect:
+        serializedVersion: 2
+        x: 349
+        y: 384
+        width: 363
+        height: 436
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 723304d31c19fedb0800000000000000
+      internalID: -4760426021964991705
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_3
+      rect:
+        serializedVersion: 2
+        x: 413
+        y: 483
+        width: 306
+        height: 376
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5488786af09c87df0800000000000000
+      internalID: -182174715852912571
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_4
+      rect:
+        serializedVersion: 2
+        x: 35
+        y: 679
+        width: 36
+        height: 20
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: da520a0716f9d0de0800000000000000
+      internalID: -1365259871173204563
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_5
+      rect:
+        serializedVersion: 2
+        x: 76
+        y: 618
+        width: 22
+        height: 11
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 2d12d7d379dafbca0800000000000000
+      internalID: -5998885313550933550
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_6
+      rect:
+        serializedVersion: 2
+        x: 88
+        y: 594
+        width: 189
+        height: 77
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a034ead5922152620800000000000000
+      internalID: 2748623116454216458
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_7
+      rect:
+        serializedVersion: 2
+        x: 714
+        y: 567
+        width: 22
+        height: 60
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 373121be10da74bb0800000000000000
+      internalID: -4951799041520168077
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_8
+      rect:
+        serializedVersion: 2
+        x: 11
+        y: 534
+        width: 218
+        height: 49
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: e3644309ed3768c30800000000000000
+      internalID: 4361300688894182974
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_9
+      rect:
+        serializedVersion: 2
+        x: 732
+        y: 533
+        width: 10
+        height: 11
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d1ef0dbf49ae037a0800000000000000
+      internalID: -6399357144892637667
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_10
+      rect:
+        serializedVersion: 2
+        x: 768
+        y: 497
+        width: 46
+        height: 40
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: ca3bbea54ecba3a10800000000000000
+      internalID: 1890030682599306156
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_11
+      rect:
+        serializedVersion: 2
+        x: 741
+        y: 520
+        width: 13
+        height: 10
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7079ca89c75554ba0800000000000000
+      internalID: -6105379726205085945
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_12
+      rect:
+        serializedVersion: 2
+        x: 770
+        y: 468
+        width: 17
+        height: 12
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d51c81c500aa7f710800000000000000
+      internalID: 1727035900641722717
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_13
+      rect:
+        serializedVersion: 2
+        x: 805
+        y: 422
+        width: 33
+        height: 14
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 9ecea4e7042beccc0800000000000000
+      internalID: -3688815054703366935
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_14
+      rect:
+        serializedVersion: 2
+        x: 617
+        y: 316
+        width: 13
+        height: 21
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0f9455ed3b6eebef0800000000000000
+      internalID: -90381282297165328
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_15
+      rect:
+        serializedVersion: 2
+        x: 807
+        y: 337
+        width: 37
+        height: 26
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 06a414908762a6df0800000000000000
+      internalID: -186294137589249440
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_16
+      rect:
+        serializedVersion: 2
+        x: 748
+        y: 286
+        width: 36
+        height: 39
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 30a7812b9819f47c0800000000000000
+      internalID: -4084886316417254909
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_17
+      rect:
+        serializedVersion: 2
+        x: 805
+        y: 283
+        width: 65
+        height: 45
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 753a747d4156c5b30800000000000000
+      internalID: 4277404886280676183
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_18
+      rect:
+        serializedVersion: 2
+        x: 854
+        y: 325
+        width: 10
+        height: 10
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 4ee0cf387ca2dd8c0800000000000000
+      internalID: -3972972259869716764
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_19
+      rect:
+        serializedVersion: 2
+        x: 571
+        y: 278
+        width: 31
+        height: 39
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: a3023a7bea70ce320800000000000000
+      internalID: 2588452332817817658
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_20
+      rect:
+        serializedVersion: 2
+        x: 599
+        y: 303
+        width: 13
+        height: 17
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 963e91b28af954cd0800000000000000
+      internalID: -2574476067345931415
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_21
+      rect:
+        serializedVersion: 2
+        x: 645
+        y: 292
+        width: 14
+        height: 26
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: d26ccd5cd789688f0800000000000000
+      internalID: -538575439466281427
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_22
+      rect:
+        serializedVersion: 2
+        x: 741
+        y: 287
+        width: 19
+        height: 31
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 48fdaab304107a2f0800000000000000
+      internalID: -961798620029722748
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_23
+      rect:
+        serializedVersion: 2
+        x: 453
+        y: 244
+        width: 69
+        height: 56
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: f84de032a747276c0800000000000000
+      internalID: -4147124238931798897
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_24
+      rect:
+        serializedVersion: 2
+        x: 521
+        y: 287
+        width: 6
+        height: 6
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 5028b2f45918a3570800000000000000
+      internalID: 8447206529365148165
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_25
+      rect:
+        serializedVersion: 2
+        x: 713
+        y: 249
+        width: 22
+        height: 49
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 396c5ff332992bcd0800000000000000
+      internalID: -2543802462834932077
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_26
+      rect:
+        serializedVersion: 2
+        x: 888
+        y: 274
+        width: 30
+        height: 20
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: c4e77aadc8bb47eb0800000000000000
+      internalID: -4722943895566582196
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_27
+      rect:
+        serializedVersion: 2
+        x: 883
+        y: 205
+        width: 90
+        height: 80
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 70457fbac555def60800000000000000
+      internalID: 8065196364200891399
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: Timeline 1_0004_28
+      rect:
+        serializedVersion: 2
+        x: 946
+        y: 238
+        width: 78
+        height: 43
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 49dd39efc9003f460800000000000000
+      internalID: 7274158497419484564
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: f0d9223e619e640b084ece9f0aac5428
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries: []
+    nameFileIdTable:
+      Timeline 1_0004_0: 2767827736144089870
+      Timeline 1_0004_1: -1892104506304078523
+      Timeline 1_0004_10: 1890030682599306156
+      Timeline 1_0004_11: -6105379726205085945
+      Timeline 1_0004_12: 1727035900641722717
+      Timeline 1_0004_13: -3688815054703366935
+      Timeline 1_0004_14: -90381282297165328
+      Timeline 1_0004_15: -186294137589249440
+      Timeline 1_0004_16: -4084886316417254909
+      Timeline 1_0004_17: 4277404886280676183
+      Timeline 1_0004_18: -3972972259869716764
+      Timeline 1_0004_19: 2588452332817817658
+      Timeline 1_0004_2: -4760426021964991705
+      Timeline 1_0004_20: -2574476067345931415
+      Timeline 1_0004_21: -538575439466281427
+      Timeline 1_0004_22: -961798620029722748
+      Timeline 1_0004_23: -4147124238931798897
+      Timeline 1_0004_24: 8447206529365148165
+      Timeline 1_0004_25: -2543802462834932077
+      Timeline 1_0004_26: -4722943895566582196
+      Timeline 1_0004_27: 8065196364200891399
+      Timeline 1_0004_28: 7274158497419484564
+      Timeline 1_0004_3: -182174715852912571
+      Timeline 1_0004_4: -1365259871173204563
+      Timeline 1_0004_5: -5998885313550933550
+      Timeline 1_0004_6: 2748623116454216458
+      Timeline 1_0004_7: -4951799041520168077
+      Timeline 1_0004_8: 4361300688894182974
+      Timeline 1_0004_9: -6399357144892637667
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
