@@ -23,6 +23,7 @@ public class SceneController : MonoBehaviour
     public GameObject goodEndingUI;     // Good Ending UI (結局動畫/劇情)
     public GameObject badEndingUI;      // Bad Ending UI (結局動畫/劇情)
     public GameObject loadingUI;        // 偽loading動畫
+    public Canvas gameUI;
     public float loadingDuration = 2f;  // loading持續時間
 
     // Ending判定
@@ -100,6 +101,16 @@ public class SceneController : MonoBehaviour
         if (Input.GetKeyDown(nextStateKey))
         {
             GoToNextState();
+        }
+        if(currentState == GameState.Gameplay)
+        {
+            if (gameUI != null)
+                gameUI.renderMode = RenderMode.ScreenSpaceOverlay;
+        }
+        else
+        {
+            if (gameUI != null)
+                gameUI.renderMode = RenderMode.ScreenSpaceCamera;
         }
     }
 
