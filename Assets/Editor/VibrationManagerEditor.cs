@@ -18,21 +18,21 @@ public class VibrationManagerEditor : Editor
         
         if (GUILayout.Button("▶ 播放 Perfect Hit 震動", GUILayout.Height(30)))
         {
-            vibrationManager.VibrateOnPerfectHit();
+            vibrationManager.VibrateOnPerfect();
         }
         
         EditorGUILayout.Space(5);
         
-        if (GUILayout.Button("▶ 播放 Great Hit 震動", GUILayout.Height(30)))
+        if (GUILayout.Button("▶ 播放 OK Hit 震動", GUILayout.Height(30)))
         {
-            vibrationManager.VibrateOnGreatHit();
+            vibrationManager.VibrateOnOK();
         }
         
         EditorGUILayout.Space(5);
         
         if (GUILayout.Button("▶ 播放 Good Hit 震動", GUILayout.Height(30)))
         {
-            vibrationManager.VibrateOnGoodHit();
+            vibrationManager.VibrateOnGood();
         }
         
         EditorGUILayout.Space(5);

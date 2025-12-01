@@ -25,32 +25,6 @@ public class MultiSwitchControllerManager : MonoBehaviour
     // 記錄已初始化過的控制器 ID
     private HashSet<int> initializedControllerIds = new HashSet<int>();
 
-    // 校正數據結構
-    [System.Serializable]
-    public struct JoyConCalibrationData
-    {
-        public Vector3 gyroOffset;
-        public Quaternion initialOrientation;
-        public bool isCalibrated;
-    }
-
-    // 存儲每個控制器的校正數據 (Key: Device ID)
-    private Dictionary<int, JoyConCalibrationData> calibrationDataMap = new Dictionary<int, JoyConCalibrationData>();
-
-    // 單例模式
-    private static MultiSwitchControllerManager instance;
-    public static MultiSwitchControllerManager Instance
-    {
-        get
-        {
-            if (instance == null)
-            {
-                instance = FindObjectOfType<MultiSwitchControllerManager>();
-            }
-            return instance;
-        }
-    }
-
     // 公開屬性，方便其他腳本訪問
     public List<SwitchControllerHID> Controllers => controllers;
 
@@ -71,65 +45,17 @@ public class MultiSwitchControllerManager : MonoBehaviour
 
     void Awake()
     {
-
-    }
-
-    /// <summary>
-    /// 保存控制器的校正數據
-    /// </summary>
-    public void SaveCalibration(int deviceId, Vector3 offset, Quaternion orientation, bool calibrated)
-    {
-        JoyConCalibrationData data = new JoyConCalibrationData
-        {
-            gyroOffset = offset,
-            initialOrientation = orientation,
-            isCalibrated = calibrated
-        };
-
-        if (calibrationDataMap.ContainsKey(deviceId))
-        {
-            calibrationDataMap[deviceId] = data;
-        }
-        else
-        {
-            calibrationDataMap.Add(deviceId, data);
-        }
-        
-        if (showDebugInfo)
-            Debug.Log($"[Manager] 已保存控制器 ID {deviceId} 的校正數據");
-    }
-
-    /// <summary>
-    /// 獲取控制器的校正數據
-    /// </summary>
-    public bool TryGetCalibration(int deviceId, out JoyConCalibrationData data)
-    {
-        return calibrationDataMap.TryGetValue(deviceId, out data);
-    }
-
-    void OnEnable()
-    {
-        // 初始化時掃描所有已連接的控制器
-        UpdateControllerList();
-                // 單例模式初始化
-        if (instance == null)
-        {
-            instance = this;
-            DontDestroyOnLoad(gameObject); // 讓此物件在切換場景時不被銷毀
-        }
-        else if (instance != this)
-        {
-            // 如果已經有另一個實例存在（例如從場景 A 切換到場景 B，場景 B 也有這個 Manager）
-            // 銷毀新的這個，保留舊的（帶有數據的）
-            Destroy(gameObject);
-            return;
-        }
-
         // 訂閱設備變化事件
         if (autoUpdateControllers)
         {
             InputSystem.onDeviceChange += OnDeviceChange;
         }
+    }
+
+    void Start()
+    {
+        // 初始化時掃描所有已連接的控制器
+        UpdateControllerList();
     }
 
     void OnDestroy()

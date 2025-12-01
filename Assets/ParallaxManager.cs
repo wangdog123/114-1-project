@@ -74,6 +74,9 @@ public class ParallaxManager : MonoBehaviour
 
     private Coroutine _cameraMoveCoroutine;
     private bool isDizzy = false; // 是否正在暈眩中
+    
+    // 公開暈眩狀態供其他腳本查詢
+    public bool IsDizzy => isDizzy;
 
 #if UNITY_EDITOR
     // Editor-only variables for camera movement

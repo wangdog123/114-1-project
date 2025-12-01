@@ -15,11 +15,11 @@ public class VibrationManager : MonoBehaviour
     [Tooltip("Perfect 擊中的震動")]
     public VibrationProfile perfectHitProfile = new VibrationProfile(300, 0.8f, 0.6f, 0.15f);
     
-    [Tooltip("Great 擊中的震動")]
-    public VibrationProfile greatHitProfile = new VibrationProfile(250, 0.6f, 0.4f, 0.12f);
-    
     [Tooltip("Good 擊中的震動")]
-    public VibrationProfile goodHitProfile = new VibrationProfile(200, 0.4f, 0.3f, 0.1f);
+    public VibrationProfile goodHitProfile = new VibrationProfile(250, 0.6f, 0.4f, 0.12f);
+    
+    [Tooltip("OK 擊中的震動")]
+    public VibrationProfile okHitProfile = new VibrationProfile(200, 0.4f, 0.3f, 0.1f);
     
     [Header("震動 Profile - 錯誤/懲罰")]
     [Tooltip("Miss 或被飛行物打到的震動")]
@@ -77,30 +77,30 @@ public class VibrationManager : MonoBehaviour
     /// Perfect 擊中震動
     /// </summary>
     [ContextMenu("測試震動/Perfect Hit")]
-    public void VibrateOnPerfectHit(int controllerIndex = -1)
+    public void VibrateOnPerfect(int controllerIndex = -1)
     {
         TriggerVibration(perfectHitProfile, controllerIndex);
         Debug.Log("[Vibration] Perfect Hit!");
     }
     
     /// <summary>
-    /// Great 擊中震動
-    /// </summary>
-    [ContextMenu("測試震動/Great Hit")]
-    public void VibrateOnGreatHit(int controllerIndex = -1)
-    {
-        TriggerVibration(greatHitProfile, controllerIndex);
-        Debug.Log("[Vibration] Great Hit!");
-    }
-    
-    /// <summary>
     /// Good 擊中震動
     /// </summary>
     [ContextMenu("測試震動/Good Hit")]
-    public void VibrateOnGoodHit(int controllerIndex = -1)
+    public void VibrateOnGood(int controllerIndex = -1)
     {
         TriggerVibration(goodHitProfile, controllerIndex);
         Debug.Log("[Vibration] Good Hit!");
+    }
+    
+    /// <summary>
+    /// OK 擊中震動
+    /// </summary>
+    [ContextMenu("測試震動/OK Hit")]
+    public void VibrateOnOK(int controllerIndex = -1)
+    {
+        TriggerVibration(okHitProfile, controllerIndex);
+        Debug.Log("[Vibration] OK Hit!");
     }
     
     /// <summary>

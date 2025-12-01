@@ -10,6 +10,9 @@ public class TimeUIController : MonoBehaviour
     public float totalTime = 30f;   // 倒數的總時間
     private float remainingTime;    // 剩餘時間
     public ParallaxManager parallaxManager; // 可選：從 ParallaxManager 拿取總時間
+    
+    // 公開剩餘時間供其他腳本查詢
+    public float RemainingTime => remainingTime;
 
     [Header("UI 元件")]
     public Slider timerSlider;      // 倒數用的 Slider

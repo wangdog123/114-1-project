@@ -70,7 +70,7 @@ public class test : MonoBehaviour
 
 
     // Start is called before the first frame update
-    void OnEnable()
+    void Start()
     {
         // 如果沒有指定管理器，嘗試自動找到
         if (controllerManager == null)
@@ -87,7 +87,6 @@ public class test : MonoBehaviour
         // 等待一幀確保控制器列表已更新
         StartCoroutine(InitializeController());
     }
-
 
     IEnumerator InitializeController()
     {
@@ -111,16 +110,6 @@ public class test : MonoBehaviour
         // 初始化陀螺仪数据
         lastGyro = currentController.angularVelocity.ReadValue();
         gyroPosition = Vector3.zero;
-        
-        // ★ 嘗試從 Manager 載入校正數據（跨場景保留）
-        if (controllerManager != null && controllerManager.TryGetCalibration(currentController.deviceId, out var savedData))
-        {
-            gyroOffset = savedData.gyroOffset;
-            initialOrientation = savedData.initialOrientation;
-            Calibrated = savedData.isCalibrated;
-            orientationCalibrated = savedData.isCalibrated;
-            Debug.Log($"[test.cs] 已從 Manager 載入控制器 {currentController.deviceId} 的校正數據！");
-        }
         
         // 如果启用自动校准，启动校准协程
         // if (!Calibrated)
@@ -158,12 +147,6 @@ public class test : MonoBehaviour
         
         gyroOffset = sum / samples;
         Debug.Log($"陀螺仪校准完成！偏移值: {gyroOffset}");
-        
-        // 保存到 Manager
-        if (controllerManager != null && currentController != null)
-        {
-            controllerManager.SaveCalibration(currentController.deviceId, gyroOffset, initialOrientation, Calibrated);
-        }
     }
 
     // Update is called once per frame
@@ -193,27 +176,21 @@ public class test : MonoBehaviour
             }
             
             // 按 South 键（B键）重新校准朝向（当你改变握持方式时）
-            if (currentController.buttonSouth.wasPressedThisFrame)
+            if (controllerManager.Controllers[controllerIndex].buttonSouth.wasPressedThisFrame)
             {
                 Vector3 recalibratedOrientationEuler = currentController.orientation.ReadValue();
                 initialOrientation = Quaternion.Euler(recalibratedOrientationEuler);
                 orientationCalibrated = true;
                 Calibrated = true;
                 Debug.Log($"朝向已重新校准: {recalibratedOrientationEuler}");
-                
-                // 保存到 Manager
-                controllerManager.SaveCalibration(currentController.deviceId, gyroOffset, initialOrientation, Calibrated);
             }
-            if (currentController.dpad.down.wasPressedThisFrame)
+            if (controllerManager.Controllers[controllerIndex].dpad.down.wasPressedThisFrame)
             {
                 Vector3 recalibratedOrientationEuler = currentController.orientation.ReadValue();
                 initialOrientation = Quaternion.Euler(recalibratedOrientationEuler);
                 orientationCalibrated = true;
                 Calibrated = true;
                 Debug.Log($"朝向已重新校准: {recalibratedOrientationEuler}");
-                
-                // 保存到 Manager
-                controllerManager.SaveCalibration(currentController.deviceId, gyroOffset, initialOrientation, Calibrated);
             }
 
             if (Time.timeScale <= 0f)
@@ -336,20 +313,11 @@ public class test : MonoBehaviour
         if (useWorldCoordinates && orientationCalibrated)
         {
             // 计算相对于初始朝向的旋转
-            // 修正：使用 Inverse(initial) * current 得到的是 "從初始轉到當前" 的旋轉
-            // 我們需要把陀螺儀的角速度（在當前手把座標系）轉換到 "初始校正時的座標系"
+            Quaternion relativeOrientation = Quaternion.Inverse(initialOrientation) * orientation;
             
-            // 1. 取得當前相對於初始的旋轉差
-            Quaternion relativeRot = Quaternion.Inverse(initialOrientation) * orientation;
-            
-            // 2. 將陀螺儀數據（本地）轉為世界（絕對）
-            // 注意：angularVelocity 是本地座標下的角速度
-            Vector3 worldAngularVel = orientation * calibratedGyro;
-            
-            // 3. 將世界角速度轉回初始座標系（這樣就跟校正時的方向一致了）
-            processedGyro = Quaternion.Inverse(initialOrientation) * worldAngularVel;
-            
-            // 簡化公式： Inverse(Init) * (Current * LocalGyro)
+            // 将陀螺仪数据转换到相对坐标系
+            worldGyro = relativeOrientation * calibratedGyro;
+            processedGyro = worldGyro;
         }
         else if (useWorldCoordinates)
         {
@@ -396,13 +364,10 @@ public class test : MonoBehaviour
         // 6. 移动虚拟光标
         if ((Mathf.Abs(mouseX) > 0.0001f || Mathf.Abs(mouseY) > 0.0001f) && virtualCursor != null)
         {
-            // 統一邏輯：根據測試結果，如果發現左右反了，可以在這裡統一反轉
-            // 假設現在上下正常，左右反了，我們把 mouseX 乘上 -1
-            
             if(this.name=="left")
                 virtualCursor.MoveCursor(-mouseX, -mouseY);
             else
-                virtualCursor.MoveCursor(mouseX, mouseY); // 這裡把 mouseX 加了負號試試
+                virtualCursor.MoveCursor(mouseX, mouseY);
         }
 
         // 更新上一帧的陀螺仪数据
