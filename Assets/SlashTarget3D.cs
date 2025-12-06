@@ -15,6 +15,8 @@ public abstract class SlashTarget : MonoBehaviour
     public float flyingDuration; // 飛行持續時間
     public float customInterval; // 自定義間隔
     public bool hasPlayedJudgmentBeat = false; // 是否已播放判定音效
+    public AudioClip hitSound; // ★ 該目標特定的擊中音效
+    public bool isTutorialTarget = false; // ★ 是否為教學目標（忽略時間窗口限制）
     
     public abstract void Initialize();
     public abstract void MarkAsCompleted();
@@ -34,17 +36,25 @@ public class SlashTarget3D : SlashTarget
     
     [Header("3D 視覺組件")]
     public MeshRenderer meshRenderer; // 3D 模型渲染器（可選，用於擊中變色）
-    public Transform slashSprite; // 劃痕 Sprite 的 Transform（需要旋轉的物件）
+    public Transform slashSprite; // 劃痕 Sprite 的 Transform
+    public SpriteRenderer targetSpriteRenderer; // 用於顯示方向圖片的 SpriteRenderer
     
     // 內部狀態
     private bool isFlying = false;
     private Vector3 startPosition;
     private float flyingProgress = 0f; // 飛行進度 (0-1)
+    public bool isPaused = false; // ★ 是否暫停飛行（但不暫停時間）
     
     void Start()
     {
         if (meshRenderer == null)
             meshRenderer = GetComponent<MeshRenderer>();
+            
+        // 自動尋找 SpriteRenderer
+        if (targetSpriteRenderer == null && slashSprite != null)
+        {
+            targetSpriteRenderer = slashSprite.GetComponent<SpriteRenderer>();
+        }
     }
     
     void Update()
@@ -55,8 +65,8 @@ public class SlashTarget3D : SlashTarget
             StartFlying();
         }
         
-        // 更新飛行位置
-        if (isFlying && !isHit && !isMissed)
+        // 更新飛行位置（★ 但如果 isPaused 則跳過）
+        if (isFlying && !isHit && !isMissed && !isPaused)
         {
             UpdateFlying();
         }
@@ -85,11 +95,27 @@ public class SlashTarget3D : SlashTarget
         flyingProgress = Mathf.Clamp01(elapsedTime / flyingDuration);
         
         // ★ 改為線性移動，確保視覺與時間完全同步
-        // float smoothProgress = Mathf.SmoothStep(0f, 1f, flyingProgress);
         float linearProgress = flyingProgress;
         
-        // ★ 拋物線飛行：在起點和目標點之間加上高度曲線
-        Vector3 endPosition = targetPoint.position + targetOffset;
+        // ★ 前半段（0-0.7）：保持分區效果，各自飛向偏移的目標點
+        // ★ 後半段（0.7-1.0）：收斂到中心目標點
+        Vector3 endPosition;
+        float convergenceThreshold = 0.85f;
+        
+        if (linearProgress < convergenceThreshold)
+        {
+            // 前半段：保持分區
+            endPosition = targetPoint.position + targetOffset;
+        }
+        else
+        {
+            // 後半段：從偏移點線性收斂到中心點
+            float convergenceProgress = (linearProgress - convergenceThreshold) / (1f - convergenceThreshold);
+            Vector3 offsetPosition = targetPoint.position + targetOffset;
+            Vector3 centerPosition = targetPoint.position;
+            endPosition = Vector3.Lerp(offsetPosition, centerPosition, convergenceProgress);
+        }
+        
         Vector3 currentPos = Vector3.Lerp(startPosition, endPosition, linearProgress);
         
         // 使用 sin 曲線創造拋物線效果（在飛行中間達到最高點）
@@ -98,12 +124,31 @@ public class SlashTarget3D : SlashTarget
         
         transform.position = currentPos;
     }
+
+    // 設定該目標的圖片（根據方向和類型）
+    public void SetDirectionSprite(Sprite sprite)
+    {
+        if (sprite == null) return;
+        
+        if (targetSpriteRenderer != null)
+        {
+            targetSpriteRenderer.sprite = sprite;
+        }
+        else if (slashSprite != null)
+        {
+            var sr = slashSprite.GetComponent<SpriteRenderer>();
+            if (sr != null)
+            {
+                sr.sprite = sprite;
+            }
+        }
+    }
     
     // 初始化目標
     public override void Initialize()
     {
-        // 根據方向旋轉劃痕 Sprite
-        RotateSpriteToDirection();
+        // ★ 不再旋轉，因為現在不同方向會使用不同的 Prefab/圖片
+        // RotateSpriteToDirection();
     }
     
     // 根據方向旋轉劃痕 Sprite（只旋轉 sprite，不旋轉整個物件）

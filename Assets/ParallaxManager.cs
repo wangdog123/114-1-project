@@ -10,6 +10,8 @@ using UnityEditor;
 public class ParallaxManager : MonoBehaviour
 {
     public Camera cam;
+    public Cinemachine.CinemachineVirtualCamera virtualCamera; // ★ 虛擬相機引用（優先使用）
+    private Transform controlledTransform; // ★ 實際控制的 Transform（虛擬相機或實體相機）
     public Transform[] layers;
 
     [Header("Camera Movement")]
@@ -235,6 +237,18 @@ public class ParallaxManager : MonoBehaviour
             cam = Camera.main;
         }
         
+        // ★ 優先使用虛擬相機的 Transform，否則使用實體相機
+        if (virtualCamera != null)
+        {
+            controlledTransform = virtualCamera.transform;
+            Debug.Log("[ParallaxManager] 使用虛擬相機控制");
+        }
+        else if (cam != null)
+        {
+            controlledTransform = cam.transform;
+            Debug.Log("[ParallaxManager] 使用實體相機控制");
+        }
+        
         footstepAudioSource = GetComponent<AudioSource>();
         if (footstepAudioSource == null)
             footstepAudioSource = gameObject.AddComponent<AudioSource>();
@@ -298,7 +312,7 @@ public class ParallaxManager : MonoBehaviour
         started = true;
 
         // Calculate the final destination with the percentage-based Z offset
-        Vector3 startPosition = cam.transform.position;
+        Vector3 startPosition = controlledTransform.position;
         Vector3 targetPosition = cameraTargetTransform.position;
         float finalZ = startPosition.z + (targetPosition.z - startPosition.z) * (stopDistancePercent / 100f);
         // store start and final Z for external usage (e.g., UI sliders)
@@ -344,7 +358,7 @@ public class ParallaxManager : MonoBehaviour
     private IEnumerator DizzyEffect()
     {
         // 1. 紀錄原始旋轉角度
-        Quaternion originalRotation = cam.transform.rotation;
+        Quaternion originalRotation = controlledTransform.rotation;
         Vector3 originalEuler = originalRotation.eulerAngles;
 
         float startTime = Time.time;
@@ -381,7 +395,7 @@ public class ParallaxManager : MonoBehaviour
             float jitterY = (Mathf.PerlinNoise(0f, Time.time * 1.3f) - 0.5f) * 2f * amplitudeJitter;
 
             // 應用到 camera（保留 Z 不變）
-            cam.transform.rotation = Quaternion.Euler(
+            controlledTransform.rotation = Quaternion.Euler(
                 originalEuler.x + rotX + jitterX,
                 originalEuler.y + rotY + jitterY,
                 originalEuler.z
@@ -394,7 +408,7 @@ public class ParallaxManager : MonoBehaviour
         Debug.Log("[ParallaxManager] 暈眩結束，開始回正...");
         
         float recoveryStart = Time.time;
-        Quaternion endDizzyRot = cam.transform.rotation; // 記住暈眩最後一刻的角度
+        Quaternion endDizzyRot = controlledTransform.rotation; // 記住暈眩最後一刻的角度
         float startVolumeWeight = (dizzyVolume != null) ? dizzyVolume.weight : 0f;
 
         while (Time.time - recoveryStart < recoveryDuration)
@@ -405,7 +419,7 @@ public class ParallaxManager : MonoBehaviour
             t = Mathf.SmoothStep(0f, 1f, t); 
 
             // 使用 Slerp 平滑轉回原始角度
-            cam.transform.rotation = Quaternion.Slerp(endDizzyRot, originalRotation, t);
+            controlledTransform.rotation = Quaternion.Slerp(endDizzyRot, originalRotation, t);
 
             // 淡出 Volume
             if (dizzyVolume != null)
@@ -416,7 +430,7 @@ public class ParallaxManager : MonoBehaviour
 
         // ================= 階段三：確保歸位 =================
         if (dizzyVolume != null) dizzyVolume.weight = 0.0f;
-        cam.transform.rotation = originalRotation;
+        controlledTransform.rotation = originalRotation;
         isDizzy = false;
         
         Debug.Log("[ParallaxManager] 視線完全恢復");
@@ -428,7 +442,7 @@ public class ParallaxManager : MonoBehaviour
 
         float elapsedTime = 0f;
         float movementProgressTime = 0f; // 追蹤實際移動的時間進度
-        Vector3 startingPosition = cam.transform.position;
+        Vector3 startingPosition = controlledTransform.position;
         
         // Reset bob timer
         bobTimer = 0f;
@@ -468,7 +482,7 @@ public class ParallaxManager : MonoBehaviour
                     }
                 }
                 
-                cam.transform.position = currentPos;
+                controlledTransform.position = currentPos;
             }
             
             // Wait for the next frame

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.SocialPlatforms.Impl;
 
 public class SceneController : MonoBehaviour
 {
@@ -25,6 +26,12 @@ public class SceneController : MonoBehaviour
     public GameObject loadingUI;        // 偽loading動畫
     public Canvas gameUI;
     public float loadingDuration = 2f;  // loading持續時間
+
+    [Header("音樂控制")]
+    public AudioSource bgmAudioSource; // BGM 音樂來源
+    public AudioClip gameplayBGM; // Gameplay 階段專用 BGM
+    private AudioClip originalBGM; // 原始 BGM
+    private float originalBGMVolume = 1f; // 原始 BGM 音量
 
     // Ending判定
     public enum EndingType { Good, Bad } // Ending類型
@@ -57,7 +64,7 @@ public class SceneController : MonoBehaviour
 
     public GameState currentState;
     private string currentScene = "";
-    private ScratchRhythmGame rhythmGame;
+    public ScratchRhythmGame rhythmGame;
     private bool isTransitioning = false; // 是否在過渡中
     // 如果場景A是從場景B繼承 EndingType，設定此旗標以避免 SetupSceneA 覆寫初始狀態
     private bool inheritedEndingPending = false;
@@ -66,6 +73,7 @@ public class SceneController : MonoBehaviour
     private TransitionController transitionController;
     // 在初始化階段允許覆寫同一狀態（避免 inspector 預設值阻止 SetState 執行）
     private bool allowSetStateWhenSame = false;
+    public scoreingame scoreingame;
 
     void OnEnable()
     {
@@ -78,6 +86,7 @@ public class SceneController : MonoBehaviour
 
         // 場景加載事件
         SceneManager.sceneLoaded += OnSceneLoaded;
+        // rhythmGame = FindObjectOfType<ScratchRhythmGame>();
     }
 
     void Start()
@@ -85,6 +94,17 @@ public class SceneController : MonoBehaviour
         // 確保 loadingUI 永遠保持 active（請在 Inspector 連結 loadingUI）
         if (loadingUI != null)
             loadingUI.SetActive(true);
+        
+        // 保存原始 BGM 音量和音樂片段
+        if (bgmAudioSource != null)
+        {
+            originalBGMVolume = bgmAudioSource.volume;
+            originalBGM = bgmAudioSource.clip;
+            
+            // ⭐ 讓 BGM 在切換場景時不被銷毀
+            DontDestroyOnLoad(bgmAudioSource.gameObject);
+            Debug.Log("[SceneController] BGM 已設定為跨場景保留");
+        }
     }
 
     void OnDestroy()
@@ -160,6 +180,14 @@ public class SceneController : MonoBehaviour
                     gameplayUI.SetActive(true);
                 if (rhythmGame != null)
                     rhythmGame.enabled = true;
+                
+                // ⭐ 切換到 Gameplay 專用 BGM
+                if (bgmAudioSource != null && gameplayBGM != null)
+                {
+                    bgmAudioSource.clip = gameplayBGM;
+                    bgmAudioSource.Play();
+                    Debug.Log("[SceneController] 已切換到 Gameplay BGM");
+                }
                 break;
 
             case GameState.GameplayLoading:
@@ -170,6 +198,14 @@ public class SceneController : MonoBehaviour
             case GameState.ScoreDisplay:
                 if (scoreUI != null)
                     scoreUI.SetActive(true);
+                
+                // ⭐ 切回原始 BGM
+                if (bgmAudioSource != null && originalBGM != null)
+                {
+                    bgmAudioSource.clip = originalBGM;
+                    bgmAudioSource.Play();
+                    Debug.Log("[SceneController] 已切回原始 BGM");
+                }
                 break;
 
             case GameState.ScoreDisplayLoading:
@@ -239,7 +275,7 @@ public class SceneController : MonoBehaviour
             // 如果剛剛有繼承的 EndingType，直接進入 ScoreDisplay
             if (hadInheritedEnding)
             {
-                SetState(GameState.ScoreDisplay);
+                SetState(GameState.Ending);
                 // 標記為已處理，避免之後的 InitializeScene 覆寫
                 inheritedEndingHandled = true;
                 inheritedEndingPending = false;
@@ -314,9 +350,9 @@ public class SceneController : MonoBehaviour
         }
 
         // 初始化遊戲邏輯（但暫不啟用）
-        rhythmGame = FindObjectOfType<ScratchRhythmGame>();
-        if (rhythmGame != null)
-            rhythmGame.enabled = false;
+        // rhythmGame = FindObjectOfType<ScratchRhythmGame>();
+        // if (rhythmGame != null)
+        //     rhythmGame.enabled = false;
 
         StartCoroutine(tcFromOtherScene());
         UpdateCurrentState();
@@ -364,14 +400,35 @@ public class SceneController : MonoBehaviour
 
             case GameState.Prologue:
                 Debug.Log("[SceneController] === 前導階段 ===");
+                
+                // ★ 將 BGM 音量調為 0
+                if (bgmAudioSource != null)
+                {
+                    bgmAudioSource.volume = 0f;
+                    Debug.Log("[SceneController] BGM 音量已調為 0");
+                }
+                
                 if (prologueUI != null)
+                {
                     prologueUI.SetActive(true);
+                    // 尋找並播放 Video Player
+                    StartCoroutine(PlayPrologueVideo());
+                }
+                
                 if (rhythmGame != null)
                     rhythmGame.enabled = false; // 前導階段不運行遊戲邏輯
                 break;
 
             case GameState.PrologueLoading:
                 Debug.Log("[SceneController] === 前導Loading ===");
+                
+                // ★ 恢復 BGM 音量
+                if (bgmAudioSource != null)
+                {
+                    bgmAudioSource.volume = originalBGMVolume;
+                    Debug.Log($"[SceneController] BGM 音量已恢復為 {originalBGMVolume}");
+                }
+                
                 StartCoroutine(ShowLoadingTransition(GameState.Tutorial));
                 break;
 
@@ -389,42 +446,92 @@ public class SceneController : MonoBehaviour
 
             case GameState.TutorialLoading:
                 Debug.Log("[SceneController] === 教學Loading ===");
+                gameUI.gameObject.SetActive(true);
                 StartCoroutine(ShowLoadingTransition(GameState.Gameplay));
                 break;
 
             case GameState.Gameplay:
                 Debug.Log("[SceneController] === 遊戲體驗階段 ===");
-                if (gameplayUI != null)
-                    gameplayUI.SetActive(true);
+                
+                // ★ 重新查找 rhythmGame 確保有效引用
+                if (rhythmGame == null)
+                {
+                    rhythmGame = FindObjectOfType<ScratchRhythmGame>();
+                    Debug.Log("[SceneController] 重新查找 RhythmGame");
+                }
+                
+                // ★ 第一步：先初始化 RhythmGame 的分數和 Combo（確保不繼承教學階段的數據）
                 if (rhythmGame != null)
+                {
+                    rhythmGame.InitializeGameScore();
+                    Debug.Log("[SceneController] RhythmGame 分數已初始化");
+                }
+                
+                // ★ 第二步：強制重置計分板（確保 score 從 0 開始）
+                if(scoreingame != null)
+                {
+                    scoreingame.InitializeScoreboard(forceReset: true);
+                    Debug.Log("[SceneController] 計分板已強制重置");
+                }
+                
+                if (gameplayUI != null)
+                {
+                    gameplayUI.SetActive(true);                    
+                    // ★ 開啟所有 GameplayUI 的子物件，除了方向提示 Canvas
+                    foreach (Transform child in gameplayUI.transform)
+                    {
+                        child.gameObject.SetActive(true);
+                    }
+                }
+                
+
+                if (rhythmGame != null)
+                {
                     rhythmGame.enabled = true; // 啟用遊戲邏輯
+                    rhythmGame.currentState = ScratchRhythmGame.GameState.WaitingForStart;
+                    
+                    rhythmGame.scoreText.text = 0.ToString();
+                    Debug.Log($"[SceneController] RhythmGame currentState 已設置為 {rhythmGame.currentState}");
+                }
+                else
+                {
+                    Debug.LogError("[SceneController] RhythmGame 為 null，無法設置狀態！");
+                }
                 break;
 
             case GameState.GameplayLoading:
                 Debug.Log("[SceneController] === 遊戲Loading ===");
                 if (rhythmGame != null)
                     rhythmGame.enabled = false;
-                StartCoroutine(ShowLoadingTransition(GameState.ScoreDisplay));
+                SetState(GameState.ScoreDisplay);
                 break;
 
             case GameState.ScoreDisplay:
                 Debug.Log("[SceneController] === 顯示分數階段 ===");
-                // if(currentScene == sceneBName)
-                // {
-                //     PlayerPrefs.SetInt("InheritedEndingType", (int)currentEndingType);
-                //     PlayerPrefs.SetString(GameState.ScoreDisplay.ToString(), currentState.ToString());
-                //     PlayerPrefs.Save();
-                //     Debug.Log($"[SceneController] 儲存 EndingType 給場景A: {currentEndingType}");
-                //     SceneManager.LoadScene(sceneAName);
-                //     return;
-                // }
-                StartCoroutine(tcFromOtherScene());
                 if (scoreUI != null)
                 {
                     scoreUI.SetActive(true);
                 }
-                if (rhythmGame != null)
+                if(gameplayUI != null)
+                {
+                    gameplayUI.SetActive(true);
+                    foreach (Transform child in gameplayUI.transform)
+                    {
+                        if(child.gameObject.name != "Backgrounds")
+                            child.gameObject.SetActive(false);
+                        else
+                            child.gameObject.SetActive(true);
+                    }
+                }
+
+                if(scoreingame != null)
+                {
+                    scoreingame.UpdateUI();
+                }
+                if (rhythmGame != null){
                     rhythmGame.enabled = false;
+                    rhythmGame.introAnimationObject.SetActive(false);
+                }
                 break;
             case GameState.ScoreDisplayLoading:
                 Debug.Log("[SceneController] === 分數展示Loading ===");
@@ -432,21 +539,37 @@ public class SceneController : MonoBehaviour
                 break;
 
             case GameState.Ending:
+                if(currentScene == sceneBName)
+                {
+                    PlayerPrefs.SetInt("InheritedEndingType", (int)currentEndingType);
+                    PlayerPrefs.SetString(GameState.Ending.ToString(), currentState.ToString());
+                    PlayerPrefs.Save();
+                    Debug.Log($"[SceneController] 儲存 EndingType 給場景A: {currentEndingType}");
+                    SceneManager.LoadScene(sceneAName);
+                    return;
+                }
+                StartCoroutine(tcFromOtherScene());
                 Debug.Log("[SceneController] === 收尾階段 ===");
                 // 根據Ending類型顯示對應的UI
                 if (currentEndingType == EndingType.Good)
                 {
                     Debug.Log("[SceneController] Good Ending");
-                    if (goodEndingUI != null)
+                    if (goodEndingUI != null){
                         goodEndingUI.SetActive(true);
-                    if (badEndingUI != null)
+                        StartCoroutine(PlayGoodEnding());
+                    }
+                    if (badEndingUI != null){
                         badEndingUI.SetActive(false);
+                    }
                 }
                 else
                 {
                     Debug.Log("[SceneController] Bad Ending");
                     if (badEndingUI != null)
+                    {
                         badEndingUI.SetActive(true);
+                        StartCoroutine(PlayBadEnding());
+                    }
                     if (goodEndingUI != null)
                         goodEndingUI.SetActive(false);
                 }
@@ -507,11 +630,11 @@ public class SceneController : MonoBehaviour
         else if(nextState == GameState.Gameplay)
         {
             beforeTransition = tutorialUI;
-            afterTransition = gameplayUI;
+            afterTransition = gameUI.gameObject;
         }
         else if(nextState == GameState.ScoreDisplay)
         {
-            beforeTransition = gameplayUI;
+            beforeTransition = gameUI.gameObject;
             afterTransition = scoreUI; // 多個UI無法指定
         }
         else if(nextState == GameState.Ending)
@@ -550,10 +673,10 @@ public class SceneController : MonoBehaviour
             SceneManager.LoadScene(sceneBName);
             yield return null;
         }
-        if(nextState == GameState.ScoreDisplay)
+        if(nextState == GameState.Ending)
         {
             PlayerPrefs.SetInt("InheritedEndingType", (int)currentEndingType);
-            PlayerPrefs.SetString(GameState.ScoreDisplay.ToString(), currentState.ToString());
+            PlayerPrefs.SetString(GameState.Ending.ToString(), currentState.ToString());
             PlayerPrefs.Save();
             Debug.Log($"[SceneController] 儲存 EndingType 給場景A: {currentEndingType}");
             SceneManager.LoadScene(sceneAName);
@@ -698,5 +821,72 @@ public class SceneController : MonoBehaviour
     public bool IsInSceneB()
     {
         return currentScene == sceneBName;
+    }
+
+    /// <summary>
+    /// 在 Prologue 階段播放 Video Player
+    /// </summary>
+    IEnumerator PlayPrologueVideo()
+    {
+        // 延遲 2 秒
+        yield return new WaitForSeconds(2f);
+        
+        // 在 prologueUI 中尋找 VideoPlayer 組件
+        if (prologueUI != null)
+        {
+            UnityEngine.Video.VideoPlayer videoPlayer = prologueUI.GetComponentInChildren<UnityEngine.Video.VideoPlayer>();
+            
+            if (videoPlayer != null)
+            {
+                Debug.Log("[SceneController] 找到 Video Player，開始播放");
+                videoPlayer.Play();
+            }
+            else
+            {
+                Debug.LogWarning("[SceneController] 在 prologueUI 中未找到 Video Player 組件");
+            }
+        }
+    }
+    IEnumerator PlayGoodEnding()
+    {
+        // 延遲 2 秒
+        yield return new WaitForSeconds(2f);
+        
+        // 在 goodEndingUI 中尋找 VideoPlayer 組件
+        if (goodEndingUI != null)
+        {
+            UnityEngine.Video.VideoPlayer videoPlayer = goodEndingUI.GetComponentInChildren<UnityEngine.Video.VideoPlayer>();
+            
+            if (videoPlayer != null)
+            {
+                Debug.Log("[SceneController] 找到 Video Player，開始播放");
+                videoPlayer.Play();
+            }
+            else
+            {
+                Debug.LogWarning("[SceneController] 在 prologueUI 中未找到 Video Player 組件");
+            }
+        }
+    }
+    IEnumerator PlayBadEnding()
+    {
+        // 延遲 2 秒
+        yield return new WaitForSeconds(2f);
+        
+        // 在 badEndingUI 中尋找 VideoPlayer 組件
+        if (badEndingUI != null)
+        {
+            UnityEngine.Video.VideoPlayer videoPlayer = badEndingUI.GetComponentInChildren<UnityEngine.Video.VideoPlayer>();
+            
+            if (videoPlayer != null)
+            {
+                Debug.Log("[SceneController] 找到 Video Player，開始播放");
+                videoPlayer.Play();
+            }
+            else
+            {
+                Debug.LogWarning("[SceneController] 在 prologueUI 中未找到 Video Player 組件");
+            }
+        }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Unity.VisualScripting;
 
 public class ScratchRhythmGame : MonoBehaviour
 {
@@ -43,6 +44,7 @@ public class ScratchRhythmGame : MonoBehaviour
     
     [Header("時間管理")]
     public TimeUIController timeUIController; // 時間管理器（用於檢查時間是否到期）
+    public SceneController sceneController;
     
     [Header("劃痕檢測設置 - v3")]
     public float minSlashAccel = 1.5f;         // 觸發劃動的最低加速度閾值（使用 Joy-Con 加速度計）
@@ -51,6 +53,9 @@ public class ScratchRhythmGame : MonoBehaviour
     public float minDirectionDot = 0.8f;       // 方向判斷的餘弦閾值（0.8 ≈ 37度內）
     public float targetMinDistance = 150f;     // 目標之間的最小生成距離
     public float targetXOffsetRange = 100f;    // 上下目標的X軸隨機偏移範圍
+    
+    [Header("方向區域設置")]
+    public float directionZoneWidth = 2f;      // ★ 每個方向區域的寬度（世界單位）
     
     [Header("難度設置")]
     public int currentLevel = 1;
@@ -66,6 +71,7 @@ public class ScratchRhythmGame : MonoBehaviour
     
     [Header("Debug 模式")]
     public bool debugMode = false; // 開啟 Debug 模式
+    public bool isTutorialMode = false; // ★ 是否為教學模式（不自動循環）
     public KeyCode debugEasy = KeyCode.Alpha1; // 按 1 生成左
     public KeyCode debugNormal = KeyCode.Alpha2; // 按 2 生成右
     public KeyCode debugHard = KeyCode.Alpha3; // 按 3 生成上
@@ -73,6 +79,21 @@ public class ScratchRhythmGame : MonoBehaviour
     
     [Header("UI 引用")]
     public GameObject slashTargetPrefab; // 3D 目標預製體
+    
+    [System.Serializable]
+    public struct ProjectileTypeConfig
+    {
+        public string name;
+        public AudioClip[] hitSounds; // ★ 該類型的多個擊中音效，打中時隨機挑一個
+        [Header("方向圖片")]
+        public Sprite leftSprite;
+        public Sprite rightSprite;
+        public Sprite downLeftSprite;
+        public Sprite downRightSprite;
+    }
+
+    [Header("投擲物類型設置")]
+    public ProjectileTypeConfig[] projectileTypes; // 可拓展的投擲物類型列表（音效和圖片組合）
     
     public TextMeshProUGUI sequenceDisplayText; // 顯示序列的文本
     public TextMeshProUGUI scoreText; // 分數文本
@@ -100,8 +121,53 @@ public class ScratchRhythmGame : MonoBehaviour
     public float arcHeight = 2f; // 飛行拱高度
 
     // 遊戲狀態
-    private enum GameState { WaitingCalibration, WaitingForStart, Idle, ShowSequence, WaitingForPlayer, Checking }
-    private GameState currentState;
+    public enum GameState { WaitingCalibration, WaitingForStart, IntroAnimation, SkillCutscene, Idle, ShowSequence, WaitingForPlayer, Checking, Tutorial }
+    public GameState currentState;
+
+    // ★ 新增事件：回合結束通知
+    public event System.Action OnRoundComplete;
+    
+    [Header("開場鏡頭動畫設置 - Cinemachine")]
+    public Cinemachine.CinemachineVirtualCamera mainVirtualCamera; // 主虛擬相機（遊戲全程使用）
+    private Cinemachine.CinemachineFollowZoom followZoom; // Follow Zoom 組件引用
+    public GameObject introAnimationObject; // 開場小動畫物件（可選，例如角色特寫、Logo 等）
+    public Animator introAnimationAnimator; // 開場動畫的 Animator（可選，用於觸發動畫）
+    public string introAnimationTrigger = "Play"; // 動畫觸發器名稱
+    public float introZoomInDuration = 2.0f; // 縮放進入時間
+    public float introMinFOV = 40f; // 開場時的最小 FOV（放大效果）
+    public float introAnimationDuration = 3.0f; // 小動畫播放時間
+    public float introZoomOutDuration = 1.5f; // 縮放退出時間
+    public float normalMinFOV = 90f; // 正常遊戲時的 FOV
+    
+    [Header("隨機動畫設置（當無 Animator 時）")]
+    public float randomMoveDistance = 3f; // 隨機移動距離（像素/單位）
+    public float randomMoveSpeed = 2f; // 隨機移動速度
+    public bool keepAnimationPlaying = false; // 動畫持續播放（遊戲開始後也不停止）
+    
+    private bool isIntroAnimationActive = false;
+    private List<Coroutine> childAnimationCoroutines = new List<Coroutine>();
+    private Dictionary<Transform, Vector3> childOriginalPositions = new Dictionary<Transform, Vector3>();
+    
+    [Header("技能演出設置")]
+    public Image skillCharacterImageLeft; // 左側技能立繪
+    public Image skillCharacterImageRight; // 右側技能立繪
+    public Sprite[] skillCharacterSprites; // 技能立繪的 Sprite 陣列（技能演出時驚橚一個）
+    public Image screenDarkOverlay; // 暗黑效果的 Panel
+    public Canvas gameUICanvas; // ★ 遊戲 UI Canvas（在 Cutscene 時改為 Space Screen，結束後改為 Overlay）
+    public float skillCutsceneDuration = 3f; // 技能演出續時間
+    public float skillSlideInDuration = 0.5f; // 立繪滑入時間
+    
+    [Header("方向提示設置")]
+    public Image directionIndicatorImage; // ★ 方向提示 Image（通過旋轉改變方向）
+    
+    // 技能演出相關變數
+    private float skillCutsceneStartTime = -1f;
+    private RenderMode originalCanvasRenderMode; // ★ 儲存原始的 Canvas Render Mode
+    private bool isSkillCutsceneActive = false;
+    
+    // 暫存下一輪的設定
+    private string pendingDifficulty = null;
+    private float pendingBpm = -1f;
     
     // 序列數據
     private List<SlashDirection> currentSequence = new List<SlashDirection>();
@@ -143,6 +209,12 @@ public class ScratchRhythmGame : MonoBehaviour
     private int score = 0;
     private int combo = 0;
     
+    // ★ 記分板系統
+    private scoreingame scoreboard;
+    
+    // ★ 暫存每個 target 的音效（防止 destroy 時音效被中斷）
+    private Dictionary<SlashTarget, AudioClip> targetHitSounds = new Dictionary<SlashTarget, AudioClip>();
+    
     // ★ 間隔判定
     private float lastPlayerHitTime = -1f; // 上一次玩家擊打時間（-1表示還沒打過）
     private int hitCount = 0; // 已擊中物件數量
@@ -154,6 +226,14 @@ public class ScratchRhythmGame : MonoBehaviour
     
     void OnEnable()
     {
+        // ★ 初始化技能演出UI狀態（隱藏）
+        if (skillCharacterImageLeft != null) skillCharacterImageLeft.gameObject.SetActive(false);
+        if (skillCharacterImageRight != null) skillCharacterImageRight.gameObject.SetActive(false);
+        if (screenDarkOverlay != null) screenDarkOverlay.gameObject.SetActive(false);
+        
+        // ★ 初始化方向提示Image（隱藏）
+        if (directionIndicatorImage != null) directionIndicatorImage.gameObject.SetActive(false);
+
         // 初始化音效組件
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
@@ -240,44 +320,37 @@ public class ScratchRhythmGame : MonoBehaviour
     
     void Update()
     {
-        
-        // 檢查是否需要校正（無論什麼狀態，只要需要校正就切換）
-        if (calijoycon && !AreAllConnectedControllersCalibrated() && currentState != GameState.WaitingCalibration)
+        // ★ 開場鏡頭動畫處理
+        if (currentState == GameState.IntroAnimation)
         {
-            currentState = GameState.WaitingCalibration;
-            ShowCalibrationPrompt();
-            Debug.Log("[Update] 檢測到未校正的手把，進入校正模式");
+            // 動畫由 Coroutine 控制，這裡不做處理
             return;
         }
-
-        // 等待校正狀態
+        
+        // ★ 技能演出處理
+        if (currentState == GameState.SkillCutscene)
+        {
+            UpdateSkillCutscene();
+            return;
+        }
+        
+        // ★ 校正階段檢查
         if (currentState == GameState.WaitingCalibration)
         {
-            // 檢查是否所有已連接的手把都已完成校正
             if (AreAllConnectedControllersCalibrated())
             {
                 HideCalibrationPrompt();
-                Debug.Log("所有已連接的手把校正完成！開始遊戲");
-                
-                if (!debugMode)
-                {
-                    currentState = GameState.WaitingForStart;
-                    // StartNewRound();
-                }
-                else
-                {
-                    currentState = GameState.WaitingForPlayer;
-                    sequenceDisplayText.text = "Debug 模式 - 按數字鍵生成目標";
-                }
+                Debug.Log("所有已連接的手把校正完成！等待 Start 按鈕...");
+                currentState = GameState.WaitingForStart;
             }
             return; // 校正中不執行其他邏輯
         }
-                // 等待按 Start 開始
+        
+        // 等待按 Start 開始
         if (currentState == GameState.WaitingForStart)
         {
             // 檢測任何一個 Joy-Con 的 Start 按鈕
             bool startPressed = false;
-            
             
             // 或者按鍵盤 Space 以便測試
             if (Input.GetKeyDown(KeyCode.Space))
@@ -287,17 +360,10 @@ public class ScratchRhythmGame : MonoBehaviour
             
             if (startPressed)
             {
-                Debug.Log("[遊戲] Start 按鈕觸發，開始遊戲！");
+                Debug.Log("[遊戲] Start 按鈕觸發，開始開場鏡頭動畫！");
                 
-                // 啟動視差背景移動
-                if (parallaxManager != null)
-                {
-                    parallaxManager.StartCameraMove();
-                    Debug.Log("[遊戲] 啟動 ParallaxManager 相機移動");
-                }
-                
-                // 開始第一回合
-                StartNewRound();
+                // ★ 先進入開場鏡頭動畫階段
+                StartIntroAnimation();
                 return;
             }
             
@@ -308,20 +374,28 @@ public class ScratchRhythmGame : MonoBehaviour
         // Debug 模式按鍵檢測
         if (debugMode)
         {
+            // ★ 按 S 測試技能演出
+            if (Input.GetKeyDown(KeyCode.S))
+            {
+                Debug.Log("[Debug] 按 S 測試技能演出");
+                StartSkillCutscene();
+                return;
+            }
+            
             if (Input.GetKeyDown(debugEasy))
             {
                 Debug.Log("[Debug] 按 1 生成 Easy 難度序列");
-                StartNewRound("easy", bpm);
+                StartSkillCutscene("easy", bpm);
             }
             else if (Input.GetKeyDown(debugNormal))
             {
                 Debug.Log("[Debug] 按 2 生成 Normal 難度序列");
-                StartNewRound("normal", bpm);
+                StartSkillCutscene("normal", bpm);
             }
             else if (Input.GetKeyDown(debugHard))
             {
                 Debug.Log("[Debug] 按 3 生成 Hard 難度序列");
-                StartNewRound("hard", bpm);
+                StartSkillCutscene("hard", bpm);
             }
             else if (Input.GetKeyDown(debugClearKey))
             {
@@ -337,7 +411,7 @@ public class ScratchRhythmGame : MonoBehaviour
         }
         
         // ===== 階段2：遊戲階段 - 檢測飛行物件和玩家操作 =====
-        if (isInGameplayPhase && activeTargets.Count > 0)
+        if ((isInGameplayPhase || isTutorialMode) && activeTargets.Count > 0)
         {
             // ★ 檢查所有目標的飛行狀態
             for (int i = 0; i < activeTargets.Count; i++)
@@ -382,6 +456,25 @@ public class ScratchRhythmGame : MonoBehaviour
         
         if (isInGameplayPhase)
         {
+            // ★ 檢查時間是否為 0（非教學模式）
+            if (!isTutorialMode && timeUIController != null && timeUIController.RemainingTime <= 0)
+            {
+                Debug.Log("[遊戲階段] 時間已到，清除所有目標並關閉 UI");
+                
+                // 清除所有剩餘目標
+                ClearAllTargetsInternal();
+                
+                // 關閉方向提示 UI
+                HideDirectionIndicator();
+                
+                // 關閉圓圈指示器 UI
+                StopTimingIndicator();
+                
+                // 結束游戲階段
+                StartCoroutine(GameEnded());
+
+                return;
+            }
             
             // ★ 更新飛行倒數計時器（顯示下一個未擊中物件的剩餘時間）
             UpdateFlyingTimer();
@@ -405,13 +498,14 @@ public class ScratchRhythmGame : MonoBehaviour
             }
         }
         
-        if (currentState == GameState.WaitingForPlayer)
+        // ★ Tutorial 模式和 WaitingForPlayer 都要偵測輸入
+        if (currentState == GameState.WaitingForPlayer || currentState == GameState.Tutorial)
         {
             DetectSlashInput();
         }
         
-        // ★ 將指示器更新移到最後，確保在輸入處理後立即更新視覺
-        if (isInGameplayPhase)
+        // ★ Tutorial 模式和遊戲階段都要更新指示器
+        if (isInGameplayPhase || currentState == GameState.Tutorial)
         {
             UpdateTimingIndicator();
         }
@@ -603,10 +697,17 @@ public class ScratchRhythmGame : MonoBehaviour
         SlashTarget nextTarget = null;
         int minStepIndex = int.MaxValue;
         
+        Debug.Log($"[FindFlyingTarget] activeTargets.Count={activeTargets.Count}, 尋找方向={direction}, currentTime={currentTime:F3}");
+        
         foreach (var target in activeTargets)
         {
             if (target == null || target.isHit || target.isMissed)
+            {
+                Debug.Log($"  [跳過] target==null:{target==null}, isHit:{target?.isHit}, isMissed:{target?.isMissed}");
                 continue;
+            }
+            
+            Debug.Log($"  [候選] stepIndex={target.stepIndex}, 方向={target.direction}, 飛行時間=[{target.flyingStartTime:F3}, {target.flyingStartTime + target.flyingDuration:F3}]");
             
             if (target.stepIndex < minStepIndex)
             {
@@ -616,12 +717,28 @@ public class ScratchRhythmGame : MonoBehaviour
         }
         
         // 檢查這個目標是否符合條件（方向匹配且在飛行中）
-        if (nextTarget != null &&
-            nextTarget.direction == direction &&
-            currentTime >= nextTarget.flyingStartTime && 
-            currentTime < nextTarget.flyingStartTime + nextTarget.flyingDuration)
+        if (nextTarget != null)
         {
-            return nextTarget;
+            Debug.Log($"  [找到候選] stepIndex={nextTarget.stepIndex}, 方向={nextTarget.direction}, 檢查中...");
+            
+            // ★ 教學目標忽略時間窗口限制
+            bool isInTimeWindow = nextTarget.isTutorialTarget || 
+                                  (currentTime >= nextTarget.flyingStartTime && 
+                                   currentTime < nextTarget.flyingStartTime + nextTarget.flyingDuration);
+            
+            if (nextTarget.direction == direction && isInTimeWindow)
+            {
+                Debug.Log($"  [成功找到] 目標#{nextTarget.stepIndex}");
+                return nextTarget;
+            }
+            else
+            {
+                Debug.Log($"  [條件不符] 方向匹配:{nextTarget.direction == direction}, 在時間窗口內:{isInTimeWindow}, 是教學目標:{nextTarget.isTutorialTarget}");
+            }
+        }
+        else
+        {
+            Debug.Log($"  [沒找到目標] activeTargets 中沒有未被擊中的目標");
         }
         
         return null;
@@ -690,7 +807,7 @@ public class ScratchRhythmGame : MonoBehaviour
         // 6. 成功！
         Debug.Log($"[Slash v3][控制器{cursorIndex}] ✓✓✓ 成功！方向={dir}, 距離={slashDist:F1}, 時間={slashTime:F2}s");
         // 反轉控制器索引（cursorIndex 0 -> controllerIndex 1, cursorIndex 1 -> controllerIndex 0）
-        int controllerIndexForVibration = (cursorIndex == 0) ? 0 : 1;
+        int controllerIndexForVibration = (cursorIndex == 0) ? 1 : 0;
         OnSlashComplete(target, slashDist, slashTime, controllerIndexForVibration);
         StartCoroutine(SlashCooldown(cursorIndex));
     }
@@ -781,8 +898,422 @@ public class ScratchRhythmGame : MonoBehaviour
         return ("hard", 160f, elapsedTime);
     }
 
-    // 開始新一輪
-    void StartNewRound(string overrideDifficulty = null, float overrideBpm = -1f)
+    // === 技能演出系統 ===
+    
+    // 開始技能演出
+    void StartSkillCutscene(string nextDifficulty = null, float nextBpm = -1f)
+    {
+        // 儲存下一輪的設定
+        if (nextDifficulty != null) pendingDifficulty = nextDifficulty;
+        if (nextBpm > 0) pendingBpm = nextBpm;
+
+        if (skillCharacterImageLeft == null || skillCharacterImageRight == null || screenDarkOverlay == null)
+        {
+            Debug.LogWarning("[技能演出] 未設置必要組件，跳過演出");
+            StartNewRoundAfterSkillCutscene();
+            return;
+        }
+        
+        currentState = GameState.SkillCutscene;
+        isSkillCutsceneActive = true;
+        
+        // ★ 切換遊戲 UI Canvas 為 Screen Space - Camera
+        if (gameUICanvas != null)
+        {
+            originalCanvasRenderMode = gameUICanvas.renderMode;
+            gameUICanvas.renderMode = RenderMode.ScreenSpaceCamera;
+            Debug.Log("[技能演出] Canvas 已切換為 Screen Space - Camera");
+        }
+        
+        // ★ 隨機決定顯示左邊還是右邊
+        bool showLeft = Random.value > 0.5f;
+        
+        // ★ 從 Sprite 陣列中選擇隨機立繪
+        if (skillCharacterSprites != null && skillCharacterSprites.Length > 0)
+        {
+            int randomIndex = Random.Range(0, skillCharacterSprites.Length);
+            
+            if (showLeft)
+            {
+                skillCharacterImageLeft.sprite = skillCharacterSprites[randomIndex];
+                Debug.Log($"[技能演出] 選擇左側立繪 #{randomIndex}");
+            }
+            else
+            {
+                skillCharacterImageRight.sprite = skillCharacterSprites[randomIndex];
+                Debug.Log($"[技能演出] 選擇右側立繪 #{randomIndex}");
+            }
+        }
+        
+        StartCoroutine(PlaySkillCutsceneSequence(showLeft));
+    }
+    
+    IEnumerator PlaySkillCutsceneSequence(bool showLeft)
+    {
+        // 1. 初始化狀態（設定在螢幕外）
+        // 只顯示選中的那一邊
+        if (showLeft) skillCharacterImageLeft.gameObject.SetActive(true);
+        else skillCharacterImageRight.gameObject.SetActive(true);
+        
+        screenDarkOverlay.gameObject.SetActive(true);
+        
+        // 重置透明度
+        if (showLeft)
+        {
+            Color c = skillCharacterImageLeft.color; c.a = 1; skillCharacterImageLeft.color = c;
+        }
+        else
+        {
+            Color c = skillCharacterImageRight.color; c.a = 1; skillCharacterImageRight.color = c;
+        }
+        
+        RectTransform targetRT = showLeft ? skillCharacterImageLeft.rectTransform : skillCharacterImageRight.rectTransform;
+        
+        // 記錄原始位置（假設編輯器中擺放的位置就是目標位置）
+        Vector2 originalPos = targetRT.anchoredPosition;
+        
+        // 設定起始位置（螢幕外）
+        // 左邊往左移 1000，右邊往右移 1000
+        float offset = 1000f;
+        Vector2 startPos = originalPos + new Vector2(showLeft ? -offset : offset, 0);
+        targetRT.anchoredPosition = startPos;
+        
+        // 初始化暗黑覆蓋
+        Color darkColor = screenDarkOverlay.color;
+        darkColor.a = 0f;
+        screenDarkOverlay.color = darkColor;
+        
+        Debug.Log($"[技能演出] 開始滑入動畫 ({(showLeft ? "左" : "右")})");
+        
+        // 2. 滑入 & 變暗
+        float elapsed = 0f;
+        while (elapsed < skillSlideInDuration)
+        {
+            float t = elapsed / skillSlideInDuration;
+            // EaseOutSine
+            t = Mathf.Sin(t * Mathf.PI * 0.5f);
+            
+            targetRT.anchoredPosition = Vector2.Lerp(startPos, originalPos, t);
+            
+            darkColor.a = Mathf.Lerp(0f, 0.6f, t);
+            screenDarkOverlay.color = darkColor;
+            
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        
+        // 確保位置準確
+        targetRT.anchoredPosition = originalPos;
+        darkColor.a = 0.6f;
+        screenDarkOverlay.color = darkColor;
+        
+        // 3. 停留展示
+        yield return new WaitForSeconds(skillCutsceneDuration);
+        
+        // 4. 滑出 & 變亮
+        elapsed = 0f;
+        float slideOutDuration = 0.5f;
+        while (elapsed < slideOutDuration)
+        {
+            float t = elapsed / slideOutDuration;
+            // EaseInSine (for exit)
+            // t = 1f - Mathf.Cos(t * Mathf.PI * 0.5f); 
+            // 使用簡單 Lerp 即可
+            
+            targetRT.anchoredPosition = Vector2.Lerp(originalPos, startPos, t);
+            
+            darkColor.a = Mathf.Lerp(0.6f, 0f, t);
+            screenDarkOverlay.color = darkColor;
+            
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        
+        // 隱藏
+        if (showLeft) skillCharacterImageLeft.gameObject.SetActive(false);
+        else skillCharacterImageRight.gameObject.SetActive(false);
+        
+        screenDarkOverlay.gameObject.SetActive(false);
+        
+        // 恢復位置（以便下次使用，雖然下次會重置，但保持整潔）
+        targetRT.anchoredPosition = originalPos;
+        
+        // ★ 還原遊戲 UI Canvas 的 Render Mode
+        if (gameUICanvas != null)
+        {
+            gameUICanvas.renderMode = originalCanvasRenderMode;
+            Debug.Log($"[技能演出] Canvas 已還原為 {originalCanvasRenderMode}");
+        }
+        
+        // ★ 技能演出完成，開始遊戲
+        isSkillCutsceneActive = false;
+        StartNewRoundAfterSkillCutscene();
+    }
+    
+    // 更新技能演出（邏輯已移至 Coroutine，此方法留空或移除）
+    void UpdateSkillCutscene()
+    {
+        // 空方法，由 Coroutine 控制
+    }
+    
+    // ============================================
+    // ★ 開場鏡頭動畫系統
+    // ============================================
+    
+    void StartIntroAnimation()
+    {
+        currentState = GameState.IntroAnimation;
+        
+        if (mainVirtualCamera == null)
+        {
+            Debug.LogWarning("[開場動畫] 未設置 Main Virtual Camera，跳過動畫直接開始遊戲");
+            // 直接啟動遊戲流程
+            if (parallaxManager != null)
+            {
+                parallaxManager.StartCameraMove();
+            }
+            StartSkillCutscene();
+            return;
+        }
+        
+        // 獲取 Follow Zoom 組件
+        followZoom = mainVirtualCamera.GetComponent<Cinemachine.CinemachineFollowZoom>();
+        if (followZoom == null)
+        {
+            Debug.LogWarning("[開場動畫] Virtual Camera 上未找到 Follow Zoom 組件，跳過縮放效果");
+        }
+        
+        isIntroAnimationActive = true;
+        StartCoroutine(PlayIntroAnimationSequence());
+    }
+    
+    IEnumerator PlayIntroAnimationSequence()
+    {
+        Debug.Log("[開場動畫] 開始 FOV 縮放動畫序列");
+        
+        float originalMinFOV = normalMinFOV;
+        if (followZoom != null)
+        {
+            originalMinFOV = followZoom.m_MinFOV;
+        }
+        
+        // === 第一階段：FOV 縮小（放大效果） ===
+        if (followZoom != null)
+        {
+            Debug.Log($"[開場動畫] 縮放進入，FOV: {originalMinFOV} → {introMinFOV}，時間 {introZoomInDuration}s");
+            
+            float elapsed = 0f;
+            while (elapsed < introZoomInDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0, 1, elapsed / introZoomInDuration);
+                followZoom.m_MinFOV = Mathf.Lerp(originalMinFOV, introMinFOV, t);
+                yield return null;
+            }
+            followZoom.m_MinFOV = introMinFOV;
+        }
+        else
+        {
+            yield return new WaitForSeconds(introZoomInDuration);
+        }
+        
+        // === 第二階段：Zoom In 完成後才啟動動畫 ===
+        if (introAnimationObject != null)
+        {
+            introAnimationObject.SetActive(true);
+            Debug.Log("[開場動畫] 啟動動畫物件");
+        }
+        
+        // 如果有 Animator，觸發動畫
+        if (introAnimationAnimator != null && !string.IsNullOrEmpty(introAnimationTrigger))
+        {
+            introAnimationAnimator.SetTrigger(introAnimationTrigger);
+            Debug.Log($"[開場動畫] 觸發動畫：{introAnimationTrigger}");
+        }
+        // 如果沒有 Animator，使用隨機移動動畫
+        else if (introAnimationObject != null)
+        {
+            Debug.Log("[開場動畫] 未設置 Animator，啟動隨機移動動畫");
+            StartRandomChildAnimations(introAnimationObject);
+        }
+        
+        // 等待動畫播放完成
+        Debug.Log($"[開場動畫] 播放動畫 {introAnimationDuration}s");
+        yield return new WaitForSeconds(introAnimationDuration);
+        
+        // === 第三階段：FOV 恢復（縮小效果）- 動畫繼續播放 ===
+        if (followZoom != null)
+        {
+            Debug.Log($"[開場動畫] 縮放退出，FOV: {introMinFOV} → {originalMinFOV}，時間 {introZoomOutDuration}s（動畫繼續播放）");
+            
+            float elapsed = 0f;
+            while (elapsed < introZoomOutDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.SmoothStep(0, 1, elapsed / introZoomOutDuration);
+                followZoom.m_MinFOV = Mathf.Lerp(introMinFOV, originalMinFOV, t);
+                yield return null;
+            }
+            followZoom.m_MinFOV = originalMinFOV;
+        }
+        else
+        {
+            yield return new WaitForSeconds(introZoomOutDuration);
+        }
+        
+        // === Zoom Out 完成後才停止動畫 ===
+        // 如果未勾選持續播放，則停止動畫
+        if (!keepAnimationPlaying)
+        {
+            // 停止所有隨機動畫
+            StopRandomChildAnimations();
+            
+            // 關閉動畫物件
+            if (introAnimationObject != null)
+            {
+                introAnimationObject.SetActive(false);
+            }
+        }
+        else
+        {
+            Debug.Log("[開場動畫] 持續播放模式已啟用，動畫將繼續播放");
+        }
+        
+        isIntroAnimationActive = false;
+        Debug.Log("[開場動畫] 動畫序列完成，開始遊戲流程");
+        
+        // === 動畫完成後，啟動視差背景並開始技能演出 ===
+        if (parallaxManager != null)
+        {
+            parallaxManager.StartCameraMove();
+            Debug.Log("[ParallaxManager] 視差背景已啟動");
+        }
+        
+        // 進入技能演出階段
+        StartSkillCutscene();
+    }
+    
+    // ★ 開始所有子物件的隨機移動動畫
+    void StartRandomChildAnimations(GameObject parent)
+    {
+        // 清除舊的協程列表和位置記錄
+        childAnimationCoroutines.Clear();
+        childOriginalPositions.Clear();
+        
+        // 遍歷所有子物件
+        foreach (Transform child in parent.transform)
+        {
+            if (child.gameObject.activeSelf)
+            {
+                // 保存原始位置
+                childOriginalPositions[child] = child.localPosition;
+                
+                Coroutine coroutine = StartCoroutine(RandomMoveAnimation(child));
+                childAnimationCoroutines.Add(coroutine);
+            }
+        }
+        
+        Debug.Log($"[開場動畫] 啟動 {childAnimationCoroutines.Count} 個子物件的隨機移動動畫");
+    }
+    
+    // ★ 停止所有隨機移動動畫
+    void StopRandomChildAnimations()
+    {
+        // 停止所有協程
+        foreach (var coroutine in childAnimationCoroutines)
+        {
+            if (coroutine != null)
+            {
+                StopCoroutine(coroutine);
+            }
+        }
+        
+        // 恢復所有子物件的原始位置
+        foreach (var pair in childOriginalPositions)
+        {
+            if (pair.Key != null)
+            {
+                pair.Key.localPosition = pair.Value;
+            }
+        }
+        
+        childAnimationCoroutines.Clear();
+        childOriginalPositions.Clear();
+        
+        Debug.Log("[開場動畫] 已停止所有隨機移動動畫並恢復原始位置");
+    }
+    
+    // ★ 單個物件的隨機移動動畫
+    IEnumerator RandomMoveAnimation(Transform target)
+    {
+        Vector3 originalPosition = target.localPosition;
+        
+        // 隨機延遲開始（製造錯落感）
+        float randomDelay = Random.Range(0f, 0.3f);
+        yield return new WaitForSeconds(randomDelay);
+        
+        // 所有可能的方向
+        Vector2[] directions = new Vector2[]
+        {
+            Vector2.up,
+            Vector2.down,
+            Vector2.left,
+            Vector2.right,
+            new Vector2(1, 1).normalized,    // 右上
+            new Vector2(-1, 1).normalized,   // 左上
+            new Vector2(1, -1).normalized,   // 右下
+            new Vector2(-1, -1).normalized   // 左下
+        };
+        
+        // 來回移動動畫 - 無限循環直到被 StopCoroutine 停止
+        while (true)
+        {
+            // 每個周期隨機生成新的參數
+            Vector2 randomDirection = directions[Random.Range(0, directions.Length)];
+            float randomDistance = randomMoveDistance * Random.Range(0.5f, 1.5f); // 距離也隨機
+            float randomSpeed = randomMoveSpeed * Random.Range(0.7f, 1.3f); // 速度也隨機
+            
+            Vector3 targetOffset = new Vector3(
+                randomDirection.x * randomDistance,
+                randomDirection.y * randomDistance,
+                0
+            );
+            
+            // 完成一個完整的來回動畫周期（一個正弦波周期）
+            float cycleTime = 0f;
+            float cycleDuration = (2f * Mathf.PI) / (randomSpeed * Mathf.PI); // 計算完整周期時間
+            
+            while (cycleTime < cycleDuration)
+            {
+                cycleTime += Time.deltaTime;
+                
+                // 使用正弦波創建來回移動效果
+                float wave = Mathf.Sin(cycleTime * randomSpeed * Mathf.PI);
+                target.localPosition = originalPosition + targetOffset * wave;
+                
+                yield return null;
+            }
+            
+            // 周期結束，回到原始位置，然後重新隨機新的方向
+            target.localPosition = originalPosition;
+        }
+    }
+    
+    // ★ 新增方法：在技能演出後開始遊戲
+    void StartNewRoundAfterSkillCutscene()
+    {
+        // 使用暫存的設定（如果有）
+        string diff = pendingDifficulty;
+        float b = pendingBpm;
+        
+        // 清除暫存
+        pendingDifficulty = null;
+        pendingBpm = -1f;
+        
+        StartNewRound(diff, b);
+    }
+    
+    public void StartNewRound(string overrideDifficulty = null, float overrideBpm = -1f)
     {
         Debug.Log("=== 開始新一輪 ===");
         
@@ -799,6 +1330,7 @@ public class ScratchRhythmGame : MonoBehaviour
         else if (debugMode)
         {
             Debug.Log("Debug 模式：需要傳入難度參數");
+            currentState = GameState.WaitingForPlayer;
             return;
         }
         else
@@ -855,26 +1387,56 @@ public class ScratchRhythmGame : MonoBehaviour
         currentState = GameState.ShowSequence;
         currentStepIndex = 0;
         
-        sequenceDisplayText.text = "記住這個順序...";
+        // ★ 初始化擊打計數（在每一輪開始時）
+        // 分數、combo、統計都不重置，因為需要累積到遊戲結束
+        hitCount = 0;
+        
+        // ★ 在遊戲階段開始時初始化記分板（只在非教學模式下）
+        if (!isTutorialMode)
+        {
+            if (scoreboard == null)
+                scoreboard = FindObjectOfType<scoreingame>();
+            
+            if (scoreboard != null)
+            {
+                // scoreboard.InitializeScoreboard();
+                // Debug.Log("[ScratchRhythmGame] 記分板已初始化");
+            }
+        }
+        
+
+        
+        // sequenceDisplayText.text = "記住這個順序...";
         Debug.Log($"[新回合] 時間={elapsedTime:F1}s, BPM={bpm}, 難度={difficulty}, 模式長度={currentPattern.Count}");
     }
     
     // 在節拍上生成下一個目標（提示階段）
     void SpawnNextBeatTarget()
     {
-        // ★ 檢查時間是否到期，如果時間 <= 0 就不再生成
-        if (timeUIController != null && timeUIController.RemainingTime <= 0)
+        // ★ 檢查時間是否到期，如果時間 <= 0 就不再生成（教學模式跳過）
+        if (!isTutorialMode && timeUIController != null && timeUIController.RemainingTime <= 0)
         {
-            Debug.Log("[提示階段] 時間已到，停止生成目標");
             currentState = GameState.Idle;
-            sequenceDisplayText.text = "時間到！";
+            Debug.Log("[遊戲階段] 時間已到，清除所有目標並關閉 UI");
+                
+            // 清除所有剩餘目標
+            ClearAllTargetsInternal();
+            
+            // 關閉方向提示 UI
+            HideDirectionIndicator();
+            
+            // 關閉圓圈指示器 UI
+            StopTimingIndicator();
+            
+            // 結束游戲階段
+            StartCoroutine(GameEnded());
             return;
         }
         
         if (currentPatternIndex >= currentPattern.Count)
         {
             // 所有目標已生成，準備開始遊戲階段
-            sequenceDisplayText.text = "準備好了嗎？";
+            // sequenceDisplayText.text = "準備好了嗎？";
             Debug.Log("[提示階段結束] 準備開始遊戲階段...");
             
             // ★ 立刻改變狀態，防止重複觸發
@@ -908,28 +1470,53 @@ public class ScratchRhythmGame : MonoBehaviour
 
         SlashDirection dir = currentSequence[currentSequenceIndex];
         
+        // ★ 更新方向提示 Image
+        UpdateDirectionIndicator(dir);
+        
         // 播放提示音效
         if (beatSound != null && audioSource != null)
         {
             audioSource.PlayOneShot(beatSound);
         }
         
-        // ★ 3D 模式：在世界空間生成
+        // ★ 選擇投擲物類型（隨機或根據邏輯）
+        AudioClip typeHitSound = null;
+        Sprite typeSprite = null;
+        
+        if (projectileTypes != null && projectileTypes.Length > 0)
+        {
+            // 隨機選擇一種類型
+            int typeIndex = Random.Range(0, projectileTypes.Length);
+            var pType = projectileTypes[typeIndex];
+            
+            // ★ 從該類型的音效陣列中隨機挑一個
+            if (pType.hitSounds != null && pType.hitSounds.Length > 0)
+            {
+                int soundIndex = Random.Range(0, pType.hitSounds.Length);
+                typeHitSound = pType.hitSounds[soundIndex];
+            }
+            
+            // 根據方向選擇對應圖片
+            switch (dir)
+            {
+                case SlashDirection.Left: typeSprite = pType.leftSprite; break;
+                case SlashDirection.Right: typeSprite = pType.rightSprite; break;
+                case SlashDirection.DownLeft: typeSprite = pType.downLeftSprite; break;
+                case SlashDirection.DownRight: typeSprite = pType.downRightSprite; break;
+            }
+        }
+        
+        // ★ 3D 模式：在世界空間生成（只用一個 Prefab）
         Transform parent3D = targets3DParent != null ? targets3DParent : null;
         GameObject targetObj = Instantiate(slashTargetPrefab, parent3D);
         
-        // 設置初始位置
-        Vector3 offset = Vector3.zero;
+        // ★ 根據方向計算生成位置偏差（跳舞機分區）
+        Vector3 offset = CalculateDirectionOffset(dir);
+        
         if (spawnPoint != null)
         {
             Vector3 position = spawnPoint.position;
-            
-            // 加上隨機 X 偏移，避免生成在一條直線上
-            float worldOffsetX = targetXOffsetRange / 100f; // 將 Canvas 單位轉換為世界單位 (可調整)
-            float randomX = Random.Range(-worldOffsetX, worldOffsetX);
-            offset.x = randomX;
-            position.x += randomX;
-            
+            position += offset;
             targetObj.transform.position = position;
         }
         
@@ -942,8 +1529,15 @@ public class ScratchRhythmGame : MonoBehaviour
         target3D.spawnTime = Time.time;
         target3D.spawnPoint = spawnPoint;
         target3D.targetPoint = targetPoint;
-        target3D.targetOffset = offset; // 設置目標點偏移，保持平行飛行
+        target3D.targetOffset = offset; // ★ 恢復偏移，目標點隨著生成位置偏移
         target3D.arcHeight = arcHeight;
+        
+        // ★ 設置類型特定的音效（存在字典上，不存在 target 上）
+        if (typeHitSound != null)
+        {
+            targetHitSounds[target3D] = typeHitSound;
+        }
+        if (typeSprite != null) target3D.SetDirectionSprite(typeSprite);
         
         // ★ 使用節奏生成的間隔
         target3D.customInterval = duration;
@@ -966,17 +1560,162 @@ public class ScratchRhythmGame : MonoBehaviour
         currentPatternIndex++;
         nextBeatTime += duration;
     }
+
+    // ★ 新增方法：生成教學用單一目標
+    public SlashTarget3D SpawnTutorialTarget(SlashDirection dir, float duration)
+    {
+        // ★ 3D 模式：在世界空間生成（只用一個 Prefab）
+        Transform parent3D = targets3DParent != null ? targets3DParent : null;
+        GameObject targetObj = Instantiate(slashTargetPrefab, parent3D);
+        
+        // ★ 根據方向計算生成位置偏差
+        Vector3 offset = CalculateDirectionOffset(dir);
+        
+        if (spawnPoint != null)
+        {
+            Vector3 position = spawnPoint.position;
+            position += offset;
+            targetObj.transform.position = position;
+        }
+        
+        SlashTarget3D target3D = targetObj.GetComponent<SlashTarget3D>();
+        if (target3D == null)
+            target3D = targetObj.AddComponent<SlashTarget3D>();
+        
+        target3D.direction = dir;
+        target3D.stepIndex = 999; // 特殊索引
+        target3D.spawnTime = Time.time;
+        target3D.spawnPoint = spawnPoint;
+        target3D.targetPoint = targetPoint;
+        target3D.targetOffset = offset;
+        target3D.arcHeight = arcHeight;
+        
+        // 設置方向圖片和音效
+        if (projectileTypes != null && projectileTypes.Length > 0)
+        {
+            var pType = projectileTypes[0]; // 使用第一種類型
+            Sprite typeSprite = null;
+            switch (dir)
+            {
+                case SlashDirection.Left: typeSprite = pType.leftSprite; break;
+                case SlashDirection.Right: typeSprite = pType.rightSprite; break;
+                case SlashDirection.DownLeft: typeSprite = pType.downLeftSprite; break;
+                case SlashDirection.DownRight: typeSprite = pType.downRightSprite; break;
+            }
+            if (typeSprite != null) target3D.SetDirectionSprite(typeSprite);
+            
+            // ★ 設置音效（從 projectileTypes 中隨機選一個）
+            if (pType.hitSounds != null && pType.hitSounds.Length > 0)
+            {
+                int soundIndex = Random.Range(0, pType.hitSounds.Length);
+                targetHitSounds[target3D] = pType.hitSounds[soundIndex];
+            }
+        }
+        
+        // 如果沒有從 projectileTypes 獲取到音效，使用預設音效
+        if (!targetHitSounds.ContainsKey(target3D) && hitSound != null)
+        {
+            targetHitSounds[target3D] = hitSound;
+        }
+        
+        target3D.customInterval = duration;
+        target3D.flyingStartTime = Time.time;
+        target3D.flyingDuration = duration;
+        target3D.hasPlayedJudgmentBeat = false; // ★ 教學模式也播放節拍音效
+        target3D.isTutorialTarget = true; // ★ 標記為教學目標
+        
+        target3D.Initialize();
+        activeTargets.Add(target3D);
+        
+        // ★ 只更新方向提示，不啟動圓圈指示器
+        // 圓圈指示器會在玩家階段才啟動
+        UpdateDirectionIndicator(dir);
+        
+        return target3D;
+    }
+    
+    // ★ 新增方法：更新方向提示 Image（通過旋轉）
+    void UpdateDirectionIndicator(SlashDirection direction)
+    {
+        if (directionIndicatorImage == null)
+        {
+            return;
+        }
+        
+        float rotationAngle = 0f;
+        
+        switch (direction)
+        {
+            case SlashDirection.Left:
+                rotationAngle = 180f; // 左
+                break;
+            case SlashDirection.Right:
+                rotationAngle = 0f; // 右
+                break;
+            case SlashDirection.DownLeft:
+                rotationAngle = 225f; // 左下
+                break;
+            case SlashDirection.DownRight:
+                rotationAngle = 315f; // 右下
+                break;
+        }
+        
+        directionIndicatorImage.rectTransform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
+        directionIndicatorImage.gameObject.SetActive(true);
+        Debug.Log($"[方向提示] 旋轉至 {rotationAngle}°（{direction}）");
+    }
+    
+    // ★ 新增方法：隱藏方向提示
+    public void HideDirectionIndicator()
+    {
+        if (directionIndicatorImage != null)
+        {
+            directionIndicatorImage.gameObject.SetActive(false);
+        }
+    }
+    
+    // ★ 新增方法：根據方向計算投擲物的生成位置偏差（左到右四個區域）
+    Vector3 CalculateDirectionOffset(SlashDirection direction)
+    {
+        Vector3 offset = Vector3.zero;
+        
+        switch (direction)
+        {
+            case SlashDirection.Left:
+                // 最左邊區域
+                offset.x = -directionZoneWidth * 1.5f;
+                break;
+            case SlashDirection.DownLeft:
+                // 左邊區域
+                offset.x = -directionZoneWidth * 0.5f;
+                break;
+            case SlashDirection.DownRight:
+                // 右邊區域
+                offset.x = directionZoneWidth * 0.5f;
+                break;
+            case SlashDirection.Right:
+                // 最右邊區域
+                offset.x = directionZoneWidth * 1.5f;
+                break;
+        }
+        
+        Debug.Log($"[方向區域] {direction} 偏差: {offset}");
+        return offset;
+    }
     
     // 開始遊戲階段
     IEnumerator StartGameplayPhase()
     {
         currentState = GameState.Idle; // 暫停狀態
         
+        // ★ 隱藏方向提示（提示階段結束）
+        HideDirectionIndicator();
+        
         // ★ 移除等待時間，讓指示器能完整顯示 1 秒的縮小過程
         // yield return new WaitForSeconds(beatInterval * 0.5f);
         yield return null;
         
-        sequenceDisplayText.text = "開始！跟著節拍揮動！";
+        // sequenceDisplayText.text = "開始！跟著節拍揮動！";
         
         // 記錄遊戲階段開始時間
         gameplayStartTime = Time.time;
@@ -1038,9 +1777,23 @@ public class ScratchRhythmGame : MonoBehaviour
     IEnumerator EndRound()
     {
         Debug.Log("[回合結束] 開始下一輪準備");
+        
+        // ★ 隱藏方向提示
+        HideDirectionIndicator();
+        
+        // ★ 教學模式立即觸發事件並結束
+        if (isTutorialMode)
+        {
+            Debug.Log("教學模式回合結束，立即觸發事件");
+            ClearAllTargetsInternal();
+            OnRoundComplete?.Invoke();
+            currentState = GameState.Idle;
+            yield break;
+        }
+        
         yield return new WaitForSeconds(1f);
         
-        sequenceDisplayText.text = $"完成！分數: {score}";
+        // sequenceDisplayText.text = $"完成！分數: {score}";
 
         yield return new WaitForSeconds(2f);
         
@@ -1055,7 +1808,13 @@ public class ScratchRhythmGame : MonoBehaviour
         // 可以在這裡開始下一輪或返回主選單
         Debug.Log("清除目標並開始新一輪");
         ClearAllTargetsInternal();
-        StartNewRound();
+        
+        // ★ 觸發回合結束事件
+        OnRoundComplete?.Invoke();
+
+        // ★ 在開始新一輪前先播放技能演出
+        currentState = GameState.SkillCutscene;
+        StartSkillCutscene();
     }
     
     // 劃動完成（全螢幕檢測）
@@ -1072,7 +1831,7 @@ public class ScratchRhythmGame : MonoBehaviour
             return;
         }
         
-        if (currentState != GameState.WaitingForPlayer && currentState != GameState.ShowSequence)
+        if (currentState != GameState.WaitingForPlayer && currentState != GameState.ShowSequence && currentState != GameState.Tutorial)
         {
             Debug.LogWarning($"[遊戲] ✗ 遊戲狀態不對！當前狀態={currentState}");
             return;
@@ -1087,6 +1846,12 @@ public class ScratchRhythmGame : MonoBehaviour
         int points;
         AudioClip soundToPlay = hitSound;
         float timingOffset = 0f;
+        
+        // ★ 優先從字典中取出該 target 的擊中音效
+        if (targetHitSounds.TryGetValue(target, out AudioClip targetSound))
+        {
+            soundToPlay = targetSound;
+        }
         
         // ★ 新的判定邏輯：間隔比較
         // 因為現在第一個物件也會設置 lastPlayerHitTime，所以統一使用間隔判定
@@ -1109,7 +1874,11 @@ public class ScratchRhythmGame : MonoBehaviour
             {
                 rating = "Perfect!!";
                 points = 300;
-                soundToPlay = perfectSound != null ? perfectSound : hitSound;
+                // ★ 使用字典中的音效或 Perfect 音效
+                if (!targetHitSounds.TryGetValue(target, out soundToPlay))
+                {
+                    soundToPlay = perfectSound != null ? perfectSound : hitSound;
+                }
                 
                 // 觸發 Perfect 震動（僅震動擊中的控制器）
                 if (vibrationManager != null)
@@ -1126,6 +1895,11 @@ public class ScratchRhythmGame : MonoBehaviour
             {
                 rating = "Good!";
                 points = 200;
+                // ★ 如果字典中沒有，就用預設 Hit 音效
+                if (!targetHitSounds.TryGetValue(target, out soundToPlay))
+                {
+                    soundToPlay = hitSound;
+                }
                 
                 // 觸發 Good 震動（僅震動擊中的控制器）
                 if (vibrationManager != null)
@@ -1138,6 +1912,11 @@ public class ScratchRhythmGame : MonoBehaviour
             {
                 rating = "OK";
                 points = 100;
+                // ★ 如果字典中沒有，就用預設 Hit 音效
+                if (!targetHitSounds.TryGetValue(target, out soundToPlay))
+                {
+                    soundToPlay = hitSound;
+                }
                 
                 // 觸發 OK 震動（僅震動擊中的控制器）
                 if (vibrationManager != null)
@@ -1204,6 +1983,12 @@ public class ScratchRhythmGame : MonoBehaviour
             audioSource.PlayOneShot(soundToPlay);
         }
         
+        // ★ 清理字典中的音效記錄
+        if (targetHitSounds.ContainsKey(target))
+        {
+            targetHitSounds.Remove(target);
+        }
+        
         // 劃動成功！
         target.MarkAsCompleted();
         
@@ -1212,6 +1997,19 @@ public class ScratchRhythmGame : MonoBehaviour
         {
             combo++;
             score += points * combo;
+        }
+        
+        // ★ 記錄到記分板（非教學模式）
+        if (!isTutorialMode)
+        {
+            if (scoreboard == null)
+                scoreboard = FindObjectOfType<scoreingame>();
+            
+            if (scoreboard != null)
+            {
+                scoreboard.RecordJudgment(rating, points, combo);
+                scoreboard.UpdateTotalScore(score);
+            }
         }
         
         ShowFeedback($"{rating} " + (rating != "Miss" ? $"x{combo}" : ""));
@@ -1268,6 +2066,19 @@ public class ScratchRhythmGame : MonoBehaviour
         // 重置 Combo
         combo = 0;
         
+        // ★ 記錄到記分板（非教學模式）
+        if (!isTutorialMode)
+        {
+            if (scoreboard == null)
+                scoreboard = FindObjectOfType<scoreingame>();
+            
+            if (scoreboard != null)
+            {
+                scoreboard.RecordJudgment("Miss", 0, combo);
+                scoreboard.UpdateTotalScore(score);
+            }
+        }
+        
         ShowFeedback($"Miss! -{penalty}");
         UpdateUI();
         
@@ -1323,6 +2134,19 @@ public class ScratchRhythmGame : MonoBehaviour
         
         // 重置 Combo
         combo = 0;
+        
+        // ★ 記錄到記分板（非教學模式）
+        if (!isTutorialMode)
+        {
+            if (scoreboard == null)
+                scoreboard = FindObjectOfType<scoreingame>();
+            
+            if (scoreboard != null)
+            {
+                scoreboard.RecordJudgment("Miss", 0, combo);
+                scoreboard.UpdateTotalScore(score);
+            }
+        }
         
         ShowFeedback($"Miss! -{penalty}");
         UpdateUI();
@@ -1498,7 +2322,7 @@ public class ScratchRhythmGame : MonoBehaviour
     /// <summary>
     /// 檢查所有已連接的手把是否都已校正
     /// </summary>
-    bool AreAllConnectedControllersCalibrated()
+    public bool AreAllConnectedControllersCalibrated()
     {
         bool allCalibrated = true;
         
@@ -1653,6 +2477,9 @@ public class ScratchRhythmGame : MonoBehaviour
     // 清除所有目標
     void ClearAllTargetsInternal()
     {
+        // ★ 清空音效字典
+        targetHitSounds.Clear();
+        
         foreach (var target in activeTargets)
         {
             if (target != null)
@@ -1734,8 +2561,14 @@ public class ScratchRhythmGame : MonoBehaviour
     }
     
     // 啟動指示器（第一次擊打後呼叫）
-    void ActivateTimingIndicator(float interval)
+    public void ActivateTimingIndicator(float interval)
     {
+        // ★ 同時顯示 perfectCircle（內圈）和 timingCircle（外圈）
+        if (perfectCircle != null)
+        {
+            perfectCircle.gameObject.SetActive(true);
+        }
+        
         if (timingCircle != null)
         {
             timingCircle.gameObject.SetActive(true);
@@ -1743,12 +2576,15 @@ public class ScratchRhythmGame : MonoBehaviour
             timingCircle.color = Color.red;
         }
         
+        // ★ 解決方案：重設基準時間，確保動畫從頭開始
+        lastPlayerHitTime = Time.time;
+        
         currentTargetInterval = interval;
         nextExpectedHitTime = lastPlayerHitTime + interval;
         isIndicatorActive = true;
         currentHitIndex = 1;
         
-        Debug.Log($"[指示器] 啟動，間隔={interval:F3}s, 下次預期={nextExpectedHitTime:F2}");
+        Debug.Log($"[指示器] 啟動（內外圈同時顯示），間隔={interval:F3}s, 下次預期={nextExpectedHitTime:F2}");
     }
     
     // 更新指示器目標（每次擊打後呼叫）
@@ -1772,18 +2608,188 @@ public class ScratchRhythmGame : MonoBehaviour
     }
     
     // 停止時機指示器
-    void StopTimingIndicator()
+    public void StopTimingIndicator()
     {
         isIndicatorActive = false;
         
-        // 內圈不關閉，一直保持顯示
-        // if (perfectCircle != null)
-        //     perfectCircle.gameObject.SetActive(false);
-        
-        // 只關閉外圈
+        // ★ 同時隱藏兩個圓圈
         if (timingCircle != null)
             timingCircle.gameObject.SetActive(false);
         
-        Debug.Log("[指示器] 已停止（內圈保持顯示）");
+        if (perfectCircle != null)
+            perfectCircle.gameObject.SetActive(false);
+        
+        Debug.Log("[指示器] 已停止（內外圈已隱藏）");
+    }
+
+    // ==========================================
+    // ★ Tutorial Support Methods
+    // ==========================================
+
+    public void StartTutorialMode()
+    {
+        isTutorialMode = true;
+        currentState = GameState.Tutorial;
+        // Hide gameplay UI
+        SetGameplayUIActive(false);
+    }
+    
+    /// <summary>
+    /// 初始化遊戲分數（進入 Gameplay 階段時調用，只初始化一次）
+    /// </summary>
+    public void InitializeGameScore()
+    {
+        score = 0;      // 總積分只在進入 Gameplay 時重置
+        combo = 0;      // Combo 也只在進入 Gameplay 時重置
+        hitCount = 0;   // 擊打計數只在進入 Gameplay 時重置
+        lastPlayerHitTime = -1f;
+        lastSlashTime = -1f;
+        
+        Debug.Log("[ScratchRhythmGame] 遊戲分數已初始化（進入 Gameplay），之後所有統計累積");
+    }
+
+    public void SetGameplayUIActive(bool active)
+    {
+        if (scoreText) scoreText.gameObject.SetActive(active);
+        if (feedbackText) feedbackText.gameObject.SetActive(active);
+        if (flyingTimerText) flyingTimerText.gameObject.SetActive(active);
+        if (sequenceDisplayText) sequenceDisplayText.gameObject.SetActive(active);
+    }
+
+    public SlashTarget3D lastSpawnedTutorialTarget;
+
+    public void SpawnSingleTutorialTarget(SlashDirection dir, float speedMultiplier)
+    {
+        if (slashTargetPrefab == null) return;
+
+        GameObject targetObj = Instantiate(slashTargetPrefab, spawnPoint.position, Quaternion.identity);
+        targetObj.transform.SetParent(targets3DParent);
+        
+        SlashTarget3D target3D = targetObj.AddComponent<SlashTarget3D>();
+        target3D.direction = dir;
+        target3D.spawnTime = Time.time;
+        target3D.spawnPoint = spawnPoint;
+        target3D.targetPoint = targetPoint;
+        
+        // Calculate offset
+        Vector3 offset = CalculateDirectionOffset(dir);
+        target3D.targetOffset = offset;
+        
+        target3D.arcHeight = arcHeight;
+        target3D.flyingStartTime = Time.time;
+        float duration = flyingDuration / speedMultiplier;
+        target3D.flyingDuration = duration;
+        
+        // Set sprite
+        if (projectileTypes != null && projectileTypes.Length > 0)
+        {
+             var pType = projectileTypes[0]; // Use first type
+             Sprite s = null;
+             switch(dir) {
+                 case SlashDirection.Left: s = pType.leftSprite; break;
+                 case SlashDirection.Right: s = pType.rightSprite; break;
+                 case SlashDirection.DownLeft: s = pType.downLeftSprite; break;
+                 case SlashDirection.DownRight: s = pType.downRightSprite; break;
+             }
+             if (s != null) target3D.SetDirectionSprite(s);
+        }
+
+        target3D.Initialize();
+        activeTargets.Add(target3D);
+        lastSpawnedTutorialTarget = target3D;
+        
+        // ★ Update indicator
+        UpdateDirectionIndicator(dir);
+        
+        // ★ Activate Timing Circle
+        // We manually set the timing variables to match this single target
+        if (timingCircle != null)
+        {
+            timingCircle.gameObject.SetActive(true);
+            timingCircle.transform.localScale = Vector3.one * 4f;
+            timingCircle.color = Color.red;
+        }
+        currentTargetInterval = duration;
+        // For tutorial, we want the circle to close exactly when the target arrives
+        nextExpectedHitTime = Time.time + duration;
+        lastPlayerHitTime = Time.time; // Fake last hit time
+        isIndicatorActive = true;
+    }
+
+    public void SpawnPracticeSequence(int count)
+    {
+        StartCoroutine(SpawnPracticeSequenceRoutine(count));
+    }
+
+    private IEnumerator SpawnPracticeSequenceRoutine(int count)
+    {
+        float interval = 2.0f; // Fixed interval for practice
+        
+        // Reset timing for sequence
+        lastPlayerHitTime = Time.time;
+        
+        for (int i = 0; i < count; i++)
+        {
+            SlashDirection dir = (SlashDirection)Random.Range(0, 4);
+            
+            // Spawn target
+            if (slashTargetPrefab != null)
+            {
+                GameObject targetObj = Instantiate(slashTargetPrefab, spawnPoint.position, Quaternion.identity);
+                targetObj.transform.SetParent(targets3DParent);
+                
+                SlashTarget3D target3D = targetObj.AddComponent<SlashTarget3D>();
+                target3D.direction = dir;
+                target3D.spawnTime = Time.time;
+                target3D.spawnPoint = spawnPoint;
+                target3D.targetPoint = targetPoint;
+                target3D.targetOffset = CalculateDirectionOffset(dir);
+                target3D.arcHeight = arcHeight;
+                target3D.flyingStartTime = Time.time;
+                target3D.flyingDuration = flyingDuration;
+                
+                // Set sprite
+                if (projectileTypes != null && projectileTypes.Length > 0)
+                {
+                     var pType = projectileTypes[0];
+                     Sprite s = null;
+                     switch(dir) {
+                         case SlashDirection.Left: s = pType.leftSprite; break;
+                         case SlashDirection.Right: s = pType.rightSprite; break;
+                         case SlashDirection.DownLeft: s = pType.downLeftSprite; break;
+                         case SlashDirection.DownRight: s = pType.downRightSprite; break;
+                     }
+                     if (s != null) target3D.SetDirectionSprite(s);
+                }
+
+                target3D.Initialize();
+                activeTargets.Add(target3D);
+            }
+
+            // ★ Update Indicators
+            UpdateDirectionIndicator(dir);
+            
+            // Ensure Timing Indicator is running for this new target
+            if (!isIndicatorActive)
+            {
+                lastPlayerHitTime = Time.time;
+                ActivateTimingIndicator(flyingDuration);
+            }
+            
+            yield return new WaitForSeconds(interval); 
+        }
+    }
+
+    public void StartGameFromTutorial()
+    {
+        isTutorialMode = false;
+        SetGameplayUIActive(true);
+        currentState = GameState.WaitingForStart;
+        StartSkillCutscene();
+    }
+    IEnumerator GameEnded()
+    {
+        yield return new WaitForSeconds(1.0f);
+        sceneController.SetState(SceneController.GameState.ScoreDisplay);
     }
 }
