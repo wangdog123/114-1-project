@@ -365,6 +365,8 @@ public class SceneController : MonoBehaviour
         {
             case GameState.Preparation:
                 BGMController.Instance.Resume();
+                BGMController.Instance.PlayMenuBGM();
+                BGMController.Instance.RestoreVolume();
                 Debug.Log("[SceneController] === 準備階段 ===");
                 if (preparationUI != null)
                     preparationUI.SetActive(true);
