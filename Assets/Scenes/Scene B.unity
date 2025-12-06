@@ -2062,7 +2062,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &486209788
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2090,8 +2090,6 @@ MonoBehaviour:
   loadingUI: {fileID: 1839647781}
   gameUI: {fileID: 2011468702}
   loadingDuration: 2
-  bgmAudioSource: {fileID: 0}
-  gameplayBGM: {fileID: 8300000, guid: d5777b06ce53643438fbda28fad10232, type: 3}
   currentEndingType: 0
   currentState: 4
   rhythmGame: {fileID: 962969529}
@@ -3966,7 +3964,7 @@ MonoBehaviour:
   variationChance: 0.3
   variationMinMultiplier: 0.75
   variationMaxMultiplier: 1.25
-  debugMode: 0
+  debugMode: 1
   isTutorialMode: 0
   debugEasy: 49
   debugNormal: 50

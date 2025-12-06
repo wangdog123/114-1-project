@@ -27,12 +27,6 @@ public class SceneController : MonoBehaviour
     public Canvas gameUI;
     public float loadingDuration = 2f;  // loading持續時間
 
-    [Header("音樂控制")]
-    public AudioSource bgmAudioSource; // BGM 音樂來源
-    public AudioClip gameplayBGM; // Gameplay 階段專用 BGM
-    private AudioClip originalBGM; // 原始 BGM
-    private float originalBGMVolume = 1f; // 原始 BGM 音量
-
     // Ending判定
     public enum EndingType { Good, Bad } // Ending類型
     public EndingType currentEndingType = EndingType.Good;
@@ -74,6 +68,7 @@ public class SceneController : MonoBehaviour
     // 在初始化階段允許覆寫同一狀態（避免 inspector 預設值阻止 SetState 執行）
     private bool allowSetStateWhenSame = false;
     public scoreingame scoreingame;
+    // public BGMController bgmController;
 
     void OnEnable()
     {
@@ -94,17 +89,6 @@ public class SceneController : MonoBehaviour
         // 確保 loadingUI 永遠保持 active（請在 Inspector 連結 loadingUI）
         if (loadingUI != null)
             loadingUI.SetActive(true);
-        
-        // 保存原始 BGM 音量和音樂片段
-        if (bgmAudioSource != null)
-        {
-            originalBGMVolume = bgmAudioSource.volume;
-            originalBGM = bgmAudioSource.clip;
-            
-            // ⭐ 讓 BGM 在切換場景時不被銷毀
-            DontDestroyOnLoad(bgmAudioSource.gameObject);
-            Debug.Log("[SceneController] BGM 已設定為跨場景保留");
-        }
     }
 
     void OnDestroy()
@@ -182,11 +166,9 @@ public class SceneController : MonoBehaviour
                     rhythmGame.enabled = true;
                 
                 // ⭐ 切換到 Gameplay 專用 BGM
-                if (bgmAudioSource != null && gameplayBGM != null)
+                if (BGMController.Instance != null)
                 {
-                    bgmAudioSource.clip = gameplayBGM;
-                    bgmAudioSource.Play();
-                    Debug.Log("[SceneController] 已切換到 Gameplay BGM");
+                    BGMController.Instance.PlayGameplayBGM();
                 }
                 break;
 
@@ -199,12 +181,10 @@ public class SceneController : MonoBehaviour
                 if (scoreUI != null)
                     scoreUI.SetActive(true);
                 
-                // ⭐ 切回原始 BGM
-                if (bgmAudioSource != null && originalBGM != null)
+                // ⭐ 切回選單 BGM
+                if (BGMController.Instance != null)
                 {
-                    bgmAudioSource.clip = originalBGM;
-                    bgmAudioSource.Play();
-                    Debug.Log("[SceneController] 已切回原始 BGM");
+                    BGMController.Instance.PlayMenuBGM();
                 }
                 break;
 
@@ -384,6 +364,7 @@ public class SceneController : MonoBehaviour
         switch (newState)
         {
             case GameState.Preparation:
+                BGMController.Instance.Resume();
                 Debug.Log("[SceneController] === 準備階段 ===");
                 if (preparationUI != null)
                     preparationUI.SetActive(true);
@@ -402,10 +383,9 @@ public class SceneController : MonoBehaviour
                 Debug.Log("[SceneController] === 前導階段 ===");
                 
                 // ★ 將 BGM 音量調為 0
-                if (bgmAudioSource != null)
+                if (BGMController.Instance != null)
                 {
-                    bgmAudioSource.volume = 0f;
-                    Debug.Log("[SceneController] BGM 音量已調為 0");
+                    BGMController.Instance.Mute();
                 }
                 
                 if (prologueUI != null)
@@ -423,10 +403,9 @@ public class SceneController : MonoBehaviour
                 Debug.Log("[SceneController] === 前導Loading ===");
                 
                 // ★ 恢復 BGM 音量
-                if (bgmAudioSource != null)
+                if (BGMController.Instance != null)
                 {
-                    bgmAudioSource.volume = originalBGMVolume;
-                    Debug.Log($"[SceneController] BGM 音量已恢復為 {originalBGMVolume}");
+                    BGMController.Instance.RestoreVolume();
                 }
                 
                 StartCoroutine(ShowLoadingTransition(GameState.Tutorial));
@@ -497,6 +476,7 @@ public class SceneController : MonoBehaviour
                 {
                     Debug.LogError("[SceneController] RhythmGame 為 null，無法設置狀態！");
                 }
+                BGMController.Instance.PlayGameplayBGM();
                 break;
 
             case GameState.GameplayLoading:
@@ -523,6 +503,7 @@ public class SceneController : MonoBehaviour
                             child.gameObject.SetActive(true);
                     }
                 }
+                // BGMController.Instance.PlayMenuBGM();
 
                 if(scoreingame != null)
                 {
@@ -548,6 +529,7 @@ public class SceneController : MonoBehaviour
                     SceneManager.LoadScene(sceneAName);
                     return;
                 }
+                BGMController.Instance.Pause();
                 StartCoroutine(tcFromOtherScene());
                 Debug.Log("[SceneController] === 收尾階段 ===");
                 // 根據Ending類型顯示對應的UI

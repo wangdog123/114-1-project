@@ -341,7 +341,8 @@ public class ScratchRhythmGame : MonoBehaviour
             {
                 HideCalibrationPrompt();
                 Debug.Log("所有已連接的手把校正完成！等待 Start 按鈕...");
-                currentState = GameState.WaitingForStart;
+                if(debugMode) currentState = GameState.WaitingForPlayer;
+                else currentState = GameState.WaitingForStart;
             }
             return; // 校正中不執行其他邏輯
         }
