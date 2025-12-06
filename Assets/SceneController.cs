@@ -17,8 +17,9 @@ public class SceneController : MonoBehaviour
     [Header("UI控制")]
     public GameObject preparationUI;    // 準備階段UI (主視覺/Live2D)
     public GameObject prologueUI;       // 前導階段UI (動畫、劇情、教學)
+    public GameObject tutorialUI;       // 教學階段UI (可選)
     public GameObject gameplayUI;       // 遊戲階段UI
-    public List<GameObject> scoreUI;          // 分數展示UI (積分、排行榜)
+    public GameObject scoreUI;          // 分數展示UI (積分、排行榜)
     public GameObject goodEndingUI;     // Good Ending UI (結局動畫/劇情)
     public GameObject badEndingUI;      // Bad Ending UI (結局動畫/劇情)
     public GameObject loadingUI;        // 偽loading動畫
@@ -53,22 +54,36 @@ public class SceneController : MonoBehaviour
         EndingLoading        // 收尾完成 → 準備返回(偽loading)
     }
 
-    private GameState currentState = GameState.Preparation;
+    public GameState currentState;
     private string currentScene = "";
     private ScratchRhythmGame rhythmGame;
     private bool isTransitioning = false; // 是否在過渡中
+    // 如果場景A是從場景B繼承 EndingType，設定此旗標以避免 SetupSceneA 覆寫初始狀態
+    private bool inheritedEndingPending = false;
+    // 紀錄是否已處理繼承的 Ending（用於避免重複初始化時被覆寫）
+    private bool inheritedEndingHandled = false;
+    private TransitionController transitionController;
+    // 在初始化階段允許覆寫同一狀態（避免 inspector 預設值阻止 SetState 執行）
+    private bool allowSetStateWhenSame = false;
 
-    void Start()
+    void OnEnable()
     {
         // 讀取當前場景名稱
         currentScene = SceneManager.GetActiveScene().name;
         Debug.Log($"[SceneController] 當前場景: {currentScene}");
 
         // 初始化
-        InitializeScene();
+        // InitializeScene();
 
         // 場景加載事件
         SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    void Start()
+    {
+        // 確保 loadingUI 永遠保持 active（請在 Inspector 連結 loadingUI）
+        if (loadingUI != null)
+            loadingUI.SetActive(true);
     }
 
     void OnDestroy()
@@ -79,7 +94,7 @@ public class SceneController : MonoBehaviour
     void Update()
     {
         // 持續檢查當前state，確保UI和物件狀態正確
-        UpdateCurrentState();
+        // UpdateCurrentState();
 
         // 按 Space 進入下一個狀態
         if (Input.GetKeyDown(nextStateKey))
@@ -120,8 +135,8 @@ public class SceneController : MonoBehaviour
                 break;
 
             case GameState.Tutorial:
-                if (prologueUI != null)
-                    prologueUI.SetActive(true);
+                if (tutorialUI != null)
+                    tutorialUI.SetActive(true);
                 break;
 
             case GameState.TutorialLoading:
@@ -142,9 +157,8 @@ public class SceneController : MonoBehaviour
                 break;
 
             case GameState.ScoreDisplay:
-                if (scoreUI != null && scoreUI.Count > 0)
-                    foreach (var ui in scoreUI)
-                        ui.SetActive(true);
+                if (scoreUI != null)
+                    scoreUI.SetActive(true);
                 break;
 
             case GameState.ScoreDisplayLoading:
@@ -188,9 +202,39 @@ public class SceneController : MonoBehaviour
     /// </summary>
     void InitializeScene()
     {
+        // 嘗試從 PlayerPrefs 恢復繼承的 EndingType（若先前從場景B傳來）
+        bool hadInheritedEnding = false;
+        // 不在此重置 inheritedEndingPending — 我們需要保留該旗標直到處理完成
+        if (PlayerPrefs.HasKey("InheritedEndingType"))
+        {
+            int stored = PlayerPrefs.GetInt("InheritedEndingType");
+            if (System.Enum.IsDefined(typeof(EndingType), stored))
+            {
+                currentEndingType = (EndingType)stored;
+                hadInheritedEnding = true;
+                inheritedEndingPending = true;
+                inheritedEndingHandled = false;
+                Debug.Log($"[SceneController] 恢復繼承的 EndingType: {currentEndingType}");
+            }
+            PlayerPrefs.DeleteKey("InheritedEndingType");
+        }
+
         if (currentScene == sceneAName)
         {
+            // 允許在初始化時即使 newState == currentState 也強制執行 SetState
+            allowSetStateWhenSame = true;
             SetupSceneA();
+
+            // 如果剛剛有繼承的 EndingType，直接進入 ScoreDisplay
+            if (hadInheritedEnding)
+            {
+                SetState(GameState.ScoreDisplay);
+                // 標記為已處理，避免之後的 InitializeScene 覆寫
+                inheritedEndingHandled = true;
+                inheritedEndingPending = false;
+            }
+
+            allowSetStateWhenSame = false;
         }
         else if (currentScene == sceneBName)
         {
@@ -204,9 +248,13 @@ public class SceneController : MonoBehaviour
     void SetupSceneA()
     {
         Debug.Log("[SceneController] === 場景A初始化 ===");
+        HideAllUI();
         
-        // 進入初始狀態 Preparation
-        SetState(GameState.Preparation);
+        // 進入初始狀態 Preparation（若有繼承的 Ending 或已處理則不要覆寫）
+        if (!inheritedEndingPending && !inheritedEndingHandled)
+        {
+            SetState(GameState.Preparation);
+        }
 
         // 啟用場景A物件
         foreach (var obj in sceneAObjects)
@@ -226,6 +274,7 @@ public class SceneController : MonoBehaviour
         rhythmGame = FindObjectOfType<ScratchRhythmGame>();
         if (rhythmGame != null)
             rhythmGame.enabled = false;
+        UpdateCurrentState();
     }
 
     /// <summary>
@@ -233,10 +282,11 @@ public class SceneController : MonoBehaviour
     /// </summary>
     void SetupSceneB()
     {
+        HideAllUI();
         Debug.Log("[SceneController] === 場景B初始化 ===");
 
-        // 進入初始狀態 Prologue
-        SetState(GameState.Prologue);
+        // 進入初始狀態 Tutorial
+        // SetState(GameState.Tutorial);
 
         // 啟用場景B物件
         foreach (var obj in sceneBObjects)
@@ -254,6 +304,11 @@ public class SceneController : MonoBehaviour
 
         // 初始化遊戲邏輯（但暫不啟用）
         rhythmGame = FindObjectOfType<ScratchRhythmGame>();
+        if (rhythmGame != null)
+            rhythmGame.enabled = false;
+
+        StartCoroutine(tcFromOtherScene());
+        UpdateCurrentState();
     }
 
     /// <summary>
@@ -261,7 +316,13 @@ public class SceneController : MonoBehaviour
     /// </summary>
     public void SetState(GameState newState)
     {
-        if (currentState == newState || isTransitioning)
+        // 如果正在過渡中，拒絕狀態變更
+        if (isTransitioning)
+            return;
+
+        // 預設情況下若 newState 與 currentState 相同則忽略。
+        // 在初始化期間 allowSetStateWhenSame=true 時，強制執行以確保初始化行為能被觸發。
+        if (!allowSetStateWhenSame && currentState == newState)
             return;
 
         currentState = newState;
@@ -269,6 +330,8 @@ public class SceneController : MonoBehaviour
 
         // 先隱藏所有UI
         HideAllUI();
+        TransitionController tc = FindObjectOfType<TransitionController>();
+
 
         // 根據新狀態決定啟用的物件和UI
         switch (newState)
@@ -277,6 +340,8 @@ public class SceneController : MonoBehaviour
                 Debug.Log("[SceneController] === 準備階段 ===");
                 if (preparationUI != null)
                     preparationUI.SetActive(true);
+                if(tc.canvas != null)
+                    tc.canvas.gameObject.SetActive(false);
                 if (rhythmGame != null)
                     rhythmGame.enabled = false;
                 break;
@@ -296,13 +361,17 @@ public class SceneController : MonoBehaviour
 
             case GameState.PrologueLoading:
                 Debug.Log("[SceneController] === 前導Loading ===");
-                StartCoroutine(ShowLoadingTransition(GameState.Gameplay));
+                StartCoroutine(ShowLoadingTransition(GameState.Tutorial));
                 break;
 
             case GameState.Tutorial:
                 Debug.Log("[SceneController] === 教學階段 ===");
-                if (prologueUI != null)
-                    prologueUI.SetActive(true); // 教學也用前導UI
+                // if(currentScene == sceneAName)
+                // {
+
+                // }
+                if (tutorialUI != null)
+                    tutorialUI.SetActive(true); // 教學也用前導UI
                 if (rhythmGame != null)
                     rhythmGame.enabled = false; // 教學不真正開始遊戲
                 break;
@@ -329,13 +398,19 @@ public class SceneController : MonoBehaviour
 
             case GameState.ScoreDisplay:
                 Debug.Log("[SceneController] === 顯示分數階段 ===");
+                // if(currentScene == sceneBName)
+                // {
+                //     PlayerPrefs.SetInt("InheritedEndingType", (int)currentEndingType);
+                //     PlayerPrefs.SetString(GameState.ScoreDisplay.ToString(), currentState.ToString());
+                //     PlayerPrefs.Save();
+                //     Debug.Log($"[SceneController] 儲存 EndingType 給場景A: {currentEndingType}");
+                //     SceneManager.LoadScene(sceneAName);
+                //     return;
+                // }
+                StartCoroutine(tcFromOtherScene());
                 if (scoreUI != null)
                 {
-                    foreach (var ui in scoreUI)
-                    {
-                        if (ui != null)
-                            ui.SetActive(true);
-                    }
+                    scoreUI.SetActive(true);
                 }
                 if (rhythmGame != null)
                     rhythmGame.enabled = false;
@@ -380,19 +455,19 @@ public class SceneController : MonoBehaviour
     /// </summary>
     void HideAllUI()
     {
+        // if (loadingUI != null)
+        //     loadingUI.SetActive(false);
         if (preparationUI != null)
             preparationUI.SetActive(false);
         if (prologueUI != null)
             prologueUI.SetActive(false);
+        if (tutorialUI != null)
+            tutorialUI.SetActive(false);
         if (gameplayUI != null)
             gameplayUI.SetActive(false);
         if (scoreUI != null)
         {
-            foreach (var ui in scoreUI)
-            {
-                if (ui != null)
-                    ui.SetActive(false);
-            }
+            scoreUI.SetActive(false);
         }
         if (goodEndingUI != null)
             goodEndingUI.SetActive(false);
@@ -405,23 +480,110 @@ public class SceneController : MonoBehaviour
     /// </summary>
     IEnumerator ShowLoadingTransition(GameState nextState)
     {
-        isTransitioning = true;
+        GameObject beforeTransition = null;
+        GameObject afterTransition = null;
 
-        // 顯示loading UI
-        if (loadingUI != null)
-            loadingUI.SetActive(true);
+        if(nextState == GameState.Prologue)
+        {
+            beforeTransition = preparationUI;
+            afterTransition = prologueUI;
+        }
+        else if(nextState == GameState.Tutorial)
+        {
+            beforeTransition = prologueUI;
+            // afterTransition = tutorialUI;
+        }
+        else if(nextState == GameState.Gameplay)
+        {
+            beforeTransition = tutorialUI;
+            afterTransition = gameplayUI;
+        }
+        else if(nextState == GameState.ScoreDisplay)
+        {
+            beforeTransition = gameplayUI;
+            afterTransition = scoreUI; // 多個UI無法指定
+        }
+        else if(nextState == GameState.Ending)
+        {
+            beforeTransition = scoreUI; // 多個UI無法指定
+            if (currentEndingType == EndingType.Good)
+                afterTransition = goodEndingUI;
+            else
+                afterTransition = badEndingUI;
+        }
+        else if(nextState == GameState.Preparation)
+        {
+            if(currentScene == sceneAName)
+            {
+                beforeTransition = (currentEndingType == EndingType.Good) ? goodEndingUI : badEndingUI;
+                afterTransition = preparationUI;
+            }
+        }
+        isTransitioning = true;
+        beforeTransition.SetActive(true);
+
+        // 嘗試使用 TransitionController 的 maskAnimator 來播放 Shrink/Expand
+        TransitionController tc = FindObjectOfType<TransitionController>();
+
+        if (tc != null && tc.maskAnimator != null)
+        {
+            tc.maskAnimator.gameObject.SetActive(true);
+            tc.maskAnimator.SetTrigger("Shrink");
+            yield return new WaitForSeconds(tc.shrinkTime);
+            beforeTransition.SetActive(false);
+
+        }
+        if(nextState == GameState.Tutorial)
+        {
+            // 這兩個階段不顯示 afterTransition UI
+            SceneManager.LoadScene(sceneBName);
+            yield return null;
+        }
+        if(nextState == GameState.ScoreDisplay)
+        {
+            PlayerPrefs.SetInt("InheritedEndingType", (int)currentEndingType);
+            PlayerPrefs.SetString(GameState.ScoreDisplay.ToString(), currentState.ToString());
+            PlayerPrefs.Save();
+            Debug.Log($"[SceneController] 儲存 EndingType 給場景A: {currentEndingType}");
+            SceneManager.LoadScene(sceneAName);
+            yield return null;
+        }
 
         Debug.Log($"[SceneController] Loading中... 將進入 {nextState}");
-        yield return new WaitForSeconds(loadingDuration);
+        // 等待邏輯上的 loading 時間
+        yield return new WaitForSeconds(1.0f);
+        afterTransition.SetActive(true);
 
-        // 隱藏loading UI
-        if (loadingUI != null)
-            loadingUI.SetActive(false);
+
+        // loading 結束，觸發 Expand 動畫
+        if (tc != null && tc.maskAnimator != null)
+        {
+            tc.maskAnimator.SetTrigger("Expand");
+            // 等待 expand 動畫，如果 TransitionController 有設定的 expandTime 則等該時間
+            // 等待 TransitionController 的 expand 動畫時間
+            yield return new WaitForSeconds(tc.expandTime);
+            // 動畫結束後可選擇關閉遮罩物件（保留可視化）
+            tc.maskAnimator.gameObject.SetActive(false);
+        }
 
         isTransitioning = false;
 
         // 自動進入下一個狀態
         SetState(nextState);
+    }
+    IEnumerator tcFromOtherScene()
+    {
+        TransitionController tc = FindObjectOfType<TransitionController>();
+
+        if (tc != null && tc.maskAnimator != null)
+        {
+            tc.maskAnimator.SetTrigger("Expand");
+            // 等待 expand 動畫，如果 TransitionController 有設定的 expandTime 則等該時間
+            // 等待 TransitionController 的 expand 動畫時間
+            yield return new WaitForSeconds(tc.expandTime);
+            // 動畫結束後可選擇關閉遮罩物件（保留可視化）
+            tc.maskAnimator.gameObject.SetActive(false);
+        }
     }
 
     /// <summary>
