@@ -18,12 +18,19 @@ public class Tutorial : MonoBehaviour
     public TextMeshProUGUI focusText;  // 聚焦 Panel 上的文字
     public Image darkOverlay;          // 用於淡入淡出
 
+    [Header("Tutorial State")]
+    public bool isTutorialCompleted = false; // ★ Tutorial 是否完成的旗標
+
     [Header("Stage Objects")]
     public List<GameObject> calibrationObjects; // 第二幕：校正物件
     public List<GameObject> gameplayObjects;    // 第三、四幕：遊戲物件
 
     [Header("Game UI Control")]
     public List<GameObject> gameUIElementsToActive; // ★ Tutorial 期間需要開啟的 GameUI 子物件
+
+    [Header("動畫引導")]
+    public Animator swingAnimator;     // ★ Swing 動畫 (單音符階段)
+    public Animator caliAnimator;      // ★ Calibration 動畫 (校正階段)
 
     [Header("Stage Texts")]
     [TextArea] public string stage1Text = "Are you ready?";
@@ -44,6 +51,7 @@ public class Tutorial : MonoBehaviour
         if (sceneController == null) sceneController = FindObjectOfType<SceneController>();
         if (rhythmGame == null) rhythmGame = FindObjectOfType<ScratchRhythmGame>();
 
+        isTutorialCompleted = false; // ★ 重置旗標
         StartCoroutine(TutorialSequence());
     }
 
@@ -55,6 +63,9 @@ public class Tutorial : MonoBehaviour
         if (focusPanel != null) focusPanel.SetActive(false);
         if (centerText != null) centerText.gameObject.SetActive(false);
         if (textBackground != null) textBackground.SetActive(false);
+        
+        // ★ 關閉所有動畫引導
+        StopAllAnimations();
         
         // 確保物件狀態重置（可選，視需求而定）
         ToggleObjects(calibrationObjects, false);
@@ -80,7 +91,7 @@ public class Tutorial : MonoBehaviour
         SetupGameUIForTutorial();
         
         // ★ 停頓 2 秒等轉場結束
-        yield return new WaitForSeconds(3.0f);
+        yield return new WaitForSeconds(2.0f);
 
         // === 第一幕：顯示準備文字 (淡入淡出) ===
         // 需求：遊戲場景(SceneController已處理)、文字、底色
@@ -89,6 +100,9 @@ public class Tutorial : MonoBehaviour
         // === 第二幕：校正 Joy-Con ===
         // 需求：文字、底色、校正物件
         ToggleObjects(calibrationObjects, true);
+        
+        // ★ 播放 Calibration 動畫
+        PlayAnimation("cali");
         
         // ★ 開啟文字背景和逐字稿
         if (textBackground != null) textBackground.SetActive(true);
@@ -101,10 +115,13 @@ public class Tutorial : MonoBehaviour
         // ★ 等待校正完成（文字保持顯示）
         yield return StartCoroutine(WaitForCalibration());
         
-        // 校正完成後才關閉文字
+        // 校正完成後才關閉文字和動畫
         if (centerText != null) centerText.gameObject.SetActive(false);
         if (textBackground != null) textBackground.SetActive(false);
         ToggleObjects(calibrationObjects, false);
+        
+        // ★ 關閉 Calibration 動畫
+        StopAnimation("cali");
 
         // ★ 在進入第三幕前，確保圓圈指示器全部隱藏
         if (rhythmGame != null)
@@ -159,7 +176,11 @@ public class Tutorial : MonoBehaviour
         
         // ★ 文字保持顯示，等待玩家準備
         // 可以在這裡加入按鈕或等待輸入的邏輯
-        Debug.Log("[Tutorial] 第五幕文字顯示完畢，等待遊戲開始");
+        Debug.Log("[Tutorial] 第五幕文字顯示完畢，等待玩家按下開始");
+        
+        // ★ 設置旗標，讓 SceneController 可以接收按鍵
+        isTutorialCompleted = true;
+        Debug.Log("[Tutorial] Tutorial 已完成，等待 SceneController 處理按鍵");
         
         // 交還控制權（文字保持顯示）
         // if (sceneController != null)
@@ -250,7 +271,7 @@ public class Tutorial : MonoBehaviour
         }
 
         // 持續檢查直到所有連接的手把都校正完成或超時
-        float calibrationTimeout = 30f; // 最多等30秒
+        float calibrationTimeout = 999f; // 最多等30秒
         float elapsedTime = 0f;
 
         while (elapsedTime < calibrationTimeout)
@@ -327,6 +348,9 @@ public class Tutorial : MonoBehaviour
 
         // 設置狀態為 Tutorial，允許 Slash
         rhythmGame.currentState = ScratchRhythmGame.GameState.Tutorial;
+        
+        // ★ 設置單音符教學模式
+        rhythmGame.isSingleNoteTutorial = true;
 
         // ★ 顯示提示文字前先隱藏圓圈指示器
         if (rhythmGame != null)
@@ -357,7 +381,7 @@ public class Tutorial : MonoBehaviour
 
         // 生成一個向右的音符，飛行時間 3 秒
         float flyTime = 3.0f;
-        var target = rhythmGame.SpawnTutorialTarget(ScratchRhythmGame.SlashDirection.Right, flyTime);
+        var target = rhythmGame.SpawnTutorialTarget(ScratchRhythmGame.SlashDirection.DownLeft, flyTime);
         
         // ★ 文字關閉後啟動圓圈指示器（會同時顯示內外圈）
         if (rhythmGame != null)
@@ -387,9 +411,12 @@ public class Tutorial : MonoBehaviour
             // ★ 停止物件飛行，但不暫停時間
             target.isPaused = true;
             
+            // ★ 播放 Swing 動畫
+            PlayAnimation("swing");
+            
             // 顯示 Focus Panel
             if (focusPanel != null) focusPanel.SetActive(true);
-            if (focusText != null) focusText.text = "就是現在！\n向右揮動！";
+            if (focusText != null) focusText.text = "就是現在！\n向左下揮動！";
 
             // // ★ 等待玩家打擊或超時 (5秒 Realtime)
             // float focusWaitTime = 0f;
@@ -415,7 +442,12 @@ public class Tutorial : MonoBehaviour
             rhythmGame.timingCircle.color = Color.green; // 持續顯示圓圈
             yield return null;
         }
-        if(target.isHit) focusPanel.SetActive(false);
+        
+        // ★ 停止 Swing 動畫
+        StopAnimation("swing");
+        
+        if(target != null && target.isHit) 
+            focusPanel.SetActive(false);
 
         // ★ 隱藏指示器
         if (rhythmGame != null)
@@ -506,5 +538,59 @@ public class Tutorial : MonoBehaviour
         rhythmGame.isTutorialMode = false;
         
         Debug.Log("[Tutorial] 第四幕練習回合結束");
+    }
+
+    /// <summary>
+    /// 播放指定動畫
+    /// </summary>
+    void PlayAnimation(string animationType)
+    {
+        if (animationType == "swing" && swingAnimator != null)
+        {
+            swingAnimator.gameObject.SetActive(true);
+            swingAnimator.SetTrigger("Play");
+            Debug.Log("[Tutorial] 播放 Swing 動畫");
+        }
+        else if (animationType == "cali" && caliAnimator != null)
+        {
+            caliAnimator.gameObject.SetActive(true);
+            caliAnimator.SetTrigger("Play");
+            Debug.Log("[Tutorial] 播放 Calibration 動畫");
+        }
+    }
+
+    /// <summary>
+    /// 停止指定動畫
+    /// </summary>
+    void StopAnimation(string animationType)
+    {
+        if (animationType == "swing" && swingAnimator != null)
+        {
+            swingAnimator.SetTrigger("Stop");
+            swingAnimator.gameObject.SetActive(false);
+            Debug.Log("[Tutorial] 停止 Swing 動畫");
+        }
+        else if (animationType == "cali" && caliAnimator != null)
+        {
+            caliAnimator.SetTrigger("Stop");
+            caliAnimator.gameObject.SetActive(false);
+            Debug.Log("[Tutorial] 停止 Calibration 動畫");
+        }
+    }
+
+    /// <summary>
+    /// 關閉所有動畫引導
+    /// </summary>
+    void StopAllAnimations()
+    {
+        if (swingAnimator != null)
+        {
+            swingAnimator.gameObject.SetActive(false);
+        }
+        if (caliAnimator != null)
+        {
+            caliAnimator.gameObject.SetActive(false);
+        }
+        Debug.Log("[Tutorial] 關閉所有動畫引導");
     }
 }

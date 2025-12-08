@@ -17,6 +17,7 @@ public abstract class SlashTarget : MonoBehaviour
     public bool hasPlayedJudgmentBeat = false; // 是否已播放判定音效
     public AudioClip hitSound; // ★ 該目標特定的擊中音效
     public bool isTutorialTarget = false; // ★ 是否為教學目標（忽略時間窗口限制）
+    public bool isPaused = false; // ★ 是否暫停飛行（單音符教學用）
     
     public abstract void Initialize();
     public abstract void MarkAsCompleted();
@@ -43,7 +44,6 @@ public class SlashTarget3D : SlashTarget
     private bool isFlying = false;
     private Vector3 startPosition;
     private float flyingProgress = 0f; // 飛行進度 (0-1)
-    public bool isPaused = false; // ★ 是否暫停飛行（但不暫停時間）
     
     void Start()
     {

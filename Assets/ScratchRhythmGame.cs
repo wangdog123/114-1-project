@@ -72,6 +72,7 @@ public class ScratchRhythmGame : MonoBehaviour
     [Header("Debug 模式")]
     public bool debugMode = false; // 開啟 Debug 模式
     public bool isTutorialMode = false; // ★ 是否為教學模式（不自動循環）
+    public bool isSingleNoteTutorial = false; // ★ 是否為單音符教學（只顯示Perfect，只能暫停時揮動）
     public KeyCode debugEasy = KeyCode.Alpha1; // 按 1 生成左
     public KeyCode debugNormal = KeyCode.Alpha2; // 按 2 生成右
     public KeyCode debugHard = KeyCode.Alpha3; // 按 3 生成上
@@ -164,6 +165,7 @@ public class ScratchRhythmGame : MonoBehaviour
     private float skillCutsceneStartTime = -1f;
     private RenderMode originalCanvasRenderMode; // ★ 儲存原始的 Canvas Render Mode
     private bool isSkillCutsceneActive = false;
+    private bool isGameEnding = false; // ★ 防止重複觸發 GameEnded
     
     // 暫存下一輪的設定
     private string pendingDifficulty = null;
@@ -353,10 +355,27 @@ public class ScratchRhythmGame : MonoBehaviour
             // 檢測任何一個 Joy-Con 的 Start 按鈕
             bool startPressed = false;
             
+            // ★ 直接檢查所有 SwitchControllerHID 設備
+            foreach (var device in UnityEngine.InputSystem.InputSystem.devices)
+            {
+                if (device is UnityEngine.InputSystem.Switch.SwitchControllerHID switchController)
+                {
+                    // 檢查 East 按鈕（B 鍵）或 Left D-Pad
+                    if (switchController.buttonEast.wasPressedThisFrame || 
+                        switchController.dpad.left.wasPressedThisFrame)
+                    {
+                        startPressed = true;
+                        Debug.Log($"[遊戲] 控制器按下按鈕，開始遊戲！");
+                        break;
+                    }
+                }
+            }
+            
             // 或者按鍵盤 Space 以便測試
             if (Input.GetKeyDown(KeyCode.Space))
             {
                 startPressed = true;
+                Debug.Log("[遊戲] Space 鍵觸發，開始遊戲！");
             }
             
             if (startPressed)
@@ -458,9 +477,13 @@ public class ScratchRhythmGame : MonoBehaviour
         if (isInGameplayPhase)
         {
             // ★ 檢查時間是否為 0（非教學模式）
-            if (!isTutorialMode && timeUIController != null && timeUIController.RemainingTime <= 0)
+            if (!isTutorialMode && !isGameEnding && timeUIController != null && timeUIController.RemainingTime <= 0)
             {
                 Debug.Log("[遊戲階段] 時間已到，清除所有目標並關閉 UI");
+                
+                // ★ 立即設置旗標防止重複觸發
+                isGameEnding = true;
+                isInGameplayPhase = false;
                 
                 // 清除所有剩餘目標
                 ClearAllTargetsInternal();
@@ -889,14 +912,14 @@ public class ScratchRhythmGame : MonoBehaviour
 
         if (elapsedTime < 10f)
         {
-            return ("easy", 120f, elapsedTime);
+            return ("easy", 80f, elapsedTime);
         }
         else if (elapsedTime < 20f)
         {
-            return ("normal", 140f, elapsedTime);
+            return ("normal", 100f, elapsedTime);
         }
 
-        return ("hard", 160f, elapsedTime);
+        return ("hard", 120f, elapsedTime);
     }
 
     // === 技能演出系統 ===
@@ -904,6 +927,14 @@ public class ScratchRhythmGame : MonoBehaviour
     // 開始技能演出
     void StartSkillCutscene(string nextDifficulty = null, float nextBpm = -1f)
     {
+        // ★ 如果時間已到 0，跳過 cutscene 和音符生成
+        if (!isTutorialMode && timeUIController != null && timeUIController.RemainingTime <= 0)
+        {
+            Debug.Log("[技能演出] 時間已到，跳過演出");
+            StartCoroutine(GameEnded());
+            return;
+        }
+        
         // 儲存下一輪的設定
         if (nextDifficulty != null) pendingDifficulty = nextDifficulty;
         if (nextBpm > 0) pendingBpm = nextBpm;
@@ -1318,6 +1349,9 @@ public class ScratchRhythmGame : MonoBehaviour
     {
         Debug.Log("=== 開始新一輪 ===");
         
+        // ★ 重置遊戲結束旗標
+        isGameEnding = false;
+        
         string difficulty = "easy";
         float elapsedTime = 0f;
         float targetBpm = bpm;
@@ -1628,6 +1662,13 @@ public class ScratchRhythmGame : MonoBehaviour
         target3D.Initialize();
         activeTargets.Add(target3D);
         
+        // ★ 播放提示音效（教學模式也需要）
+        if (beatSound != null && audioSource != null)
+        {
+            audioSource.PlayOneShot(beatSound);
+            Debug.Log("[Tutorial] 播放提示音效");
+        }
+        
         // ★ 只更新方向提示，不啟動圓圈指示器
         // 圓圈指示器會在玩家階段才啟動
         UpdateDirectionIndicator(dir);
@@ -1825,6 +1866,18 @@ public class ScratchRhythmGame : MonoBehaviour
         
         float currentTime = Time.time;
         
+        // ★ 單音符教學模式：只能在目標暫停時揮動
+        if (isSingleNoteTutorial)
+        {
+            if(!target.isPaused)
+            {
+                Debug.Log("[單音符教學] 目標未暫停，忽略此次揮動");
+                target.isHit = false; // 重置 isHit 標記
+                return;
+            }
+            else isSingleNoteTutorial = false; // 只允許一次
+        }
+        
         // ★ 檢查冷卻時間，防止一次揮動觸發多個物件
         if (lastSlashTime > 0 && currentTime - lastSlashTime < slashCooldown)
         {
@@ -1854,9 +1907,29 @@ public class ScratchRhythmGame : MonoBehaviour
             soundToPlay = targetSound;
         }
         
-        // ★ 新的判定邏輯：間隔比較
-        // 因為現在第一個物件也會設置 lastPlayerHitTime，所以統一使用間隔判定
-        if (lastPlayerHitTime < 0f && hitCount > 1) // 防呆：如果不是第一個且時間未設置
+        // ★ 單音符教學模式：強制判定為 Perfect
+        if (isSingleNoteTutorial)
+        {
+            rating = "Perfect!!";
+            points = 0;
+            timingOffset = 0f;
+            
+            // 使用字典中的音效或 Perfect 音效
+            if (!targetHitSounds.TryGetValue(target, out soundToPlay))
+            {
+                soundToPlay = perfectSound != null ? perfectSound : hitSound;
+            }
+            
+            // 觸發 Perfect 震動
+            if (vibrationManager != null)
+            {
+                vibrationManager.VibrateOnPerfect(controllerIndex);
+            }
+            
+            Debug.Log("[單音符教學] 強制判定為 PERFECT!!!");
+        }
+        // ★ 正常遊戲模式：間隔比較判定
+        else if (lastPlayerHitTime < 0f && hitCount > 1) // 防呆：如果不是第一個且時間未設置
         {
             // 異常情況，照舊處理
             rating = "OK";
@@ -2790,7 +2863,32 @@ public class ScratchRhythmGame : MonoBehaviour
     }
     IEnumerator GameEnded()
     {
+        // ★ 確保關閉所有立繪和暗黑覆蓋
         yield return new WaitForSeconds(1.0f);
+        parallaxManager.dizzyVolume.weight = 0;
+
+        if (skillCharacterImageLeft != null) 
+            skillCharacterImageLeft.gameObject.SetActive(false);
+        if (skillCharacterImageRight != null) 
+            skillCharacterImageRight.gameObject.SetActive(false);
+        if (screenDarkOverlay != null) 
+            screenDarkOverlay.gameObject.SetActive(false);
+        
+        // ★ 重置 cutscene 狀態
+        isSkillCutsceneActive = false;
+        
+        // ★ 還原 Canvas Render Mode
+        // if (gameUICanvas != null && originalCanvasRenderMode != RenderMode.ScreenSpaceOverlay)
+        // {
+        //     gameUICanvas.renderMode = originalCanvasRenderMode;
+        // }
+        
+        Debug.Log("[GameEnded] 立繪已關閉，1秒後切換到 ScoreDisplay");
+        
+        // ★ 保留 1 秒延遲
         sceneController.SetState(SceneController.GameState.ScoreDisplay);
+        
+        // ★ 重置旗標（下一場遊戲使用）
+        isGameEnding = false;
     }
 }

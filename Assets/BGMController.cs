@@ -28,7 +28,7 @@ public class BGMController : MonoBehaviour
         Debug.Log("[BGMController] BGM Controller 已建立並設為跨場景保留");
     }
 
-    void Start()
+    void OnEnable()
     {
         if (audioSource == null)
         {

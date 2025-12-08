@@ -155,28 +155,28 @@ public class test : MonoBehaviour
         if (currentController == null)
             return;
         // 按 West 键（Y键）暂停/继续
-            if (currentController.buttonWest.wasPressedThisFrame)
-            {
-                if (Time.timeScale > 0f)
-                {
-                    Time.timeScale = 0f;
-                }
-                else
-                {
-                    Time.timeScale = 1f;
-                }
-                return;
-            }
+            // if (currentController.buttonWest.wasPressedThisFrame)
+            // {
+            //     if (Time.timeScale > 0f)
+            //     {
+            //         Time.timeScale = 0f;
+            //     }
+            //     else
+            //     {
+            //         Time.timeScale = 1f;
+            //     }
+            //     return;
+            // }
             
-            // 按 North 键（X键）手动校准陀螺仪偏移
-            if (currentController.buttonNorth.wasPressedThisFrame)
-            {
-                StartCoroutine(CalibrateGyroOffset());
-                return;
-            }
+            // // 按 North 键（X键）手动校准陀螺仪偏移
+            // if (currentController.buttonNorth.wasPressedThisFrame)
+            // {
+            //     StartCoroutine(CalibrateGyroOffset());
+            //     return;
+            // }
             
             // 按 South 键（B键）重新校准朝向（当你改变握持方式时）
-            if (controllerManager.Controllers[controllerIndex].buttonSouth.wasPressedThisFrame)
+            if (controllerManager.Controllers[controllerIndex].rightTrigger.wasPressedThisFrame)
             {
                 Vector3 recalibratedOrientationEuler = currentController.orientation.ReadValue();
                 initialOrientation = Quaternion.Euler(recalibratedOrientationEuler);
@@ -184,7 +184,7 @@ public class test : MonoBehaviour
                 Calibrated = true;
                 Debug.Log($"朝向已重新校准: {recalibratedOrientationEuler}");
             }
-            if (controllerManager.Controllers[controllerIndex].dpad.down.wasPressedThisFrame)
+            if (controllerManager.Controllers[controllerIndex].leftTrigger.wasPressedThisFrame)
             {
                 Vector3 recalibratedOrientationEuler = currentController.orientation.ReadValue();
                 initialOrientation = Quaternion.Euler(recalibratedOrientationEuler);

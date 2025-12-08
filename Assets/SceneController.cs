@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem.Switch;
 using UnityEngine.SceneManagement;
 using UnityEngine.SocialPlatforms.Impl;
 
@@ -8,6 +9,7 @@ public class SceneController : MonoBehaviour
 {
     [Header("場景控制")]
     public KeyCode nextStateKey = KeyCode.Space; // 按此鍵進入下一個狀態
+    public bool developerMode = false; // ★ 開發者模式：允許在 Tutorial/Gameplay 階段跳過
     public string sceneAName = "Scene A";
     public string sceneBName = "Scene B";
     public List<GameObject> sceneAObjects = new List<GameObject>();
@@ -59,6 +61,7 @@ public class SceneController : MonoBehaviour
     public GameState currentState;
     private string currentScene = "";
     public ScratchRhythmGame rhythmGame;
+    public Tutorial tutorial; // ★ Tutorial 組件引用
     private bool isTransitioning = false; // 是否在過渡中
     // 如果場景A是從場景B繼承 EndingType，設定此旗標以避免 SetupSceneA 覆寫初始狀態
     private bool inheritedEndingPending = false;
@@ -69,6 +72,8 @@ public class SceneController : MonoBehaviour
     private bool allowSetStateWhenSame = false;
     public scoreingame scoreingame;
     // public BGMController bgmController;
+    public List<SwitchControllerHID> allControllers = new List<SwitchControllerHID>();
+    private bool blockoverlayswitch = false;
 
     void OnEnable()
     {
@@ -82,6 +87,9 @@ public class SceneController : MonoBehaviour
         // 場景加載事件
         SceneManager.sceneLoaded += OnSceneLoaded;
         // rhythmGame = FindObjectOfType<ScratchRhythmGame>();
+        
+        // ★ 獲取所有連接的 Switch 控制器
+        UpdateControllerList();
     }
 
     void Start()
@@ -101,21 +109,60 @@ public class SceneController : MonoBehaviour
         // 持續檢查當前state，確保UI和物件狀態正確
         // UpdateCurrentState();
 
+        // ★ Gameplay 階段時，不處理 SceneController 的按鍵，交給 RhythmGame 處理
+        if (currentState == GameState.Gameplay && !blockoverlayswitch)
+        {
+            if (gameUI != null)
+                gameUI.renderMode = RenderMode.ScreenSpaceOverlay;
+            return; // 跳過按鍵檢測，讓 RhythmGame 處理
+        }
+        
+        // ★ Tutorial 階段時，只有當 Tutorial 組件正在執行時且非開發者模式才禁止跳過
+        if (currentState == GameState.Tutorial && !developerMode)
+        {
+            // 如果 Tutorial 組件存在且未完成，禁止跳過
+            if (tutorial != null && !tutorial.isTutorialCompleted)
+            {
+                return; // Tutorial 正在執行，禁止跳過
+            }
+            // Tutorial 已結束，允許繼續
+        }
+        
+        // ★ 定期更新控制器列表（每秒更新一次避免遺漏）
+        if (Time.frameCount % 60 == 0)
+        {
+            UpdateControllerList();
+        }
+        
         // 按 Space 進入下一個狀態
         if (Input.GetKeyDown(nextStateKey))
         {
             GoToNextState();
         }
-        if(currentState == GameState.Gameplay)
+        
+        // ★ 檢查所有控制器的按鈕
+        bool anyButtonPressed = false;
+        foreach (var controller in allControllers)
         {
-            if (gameUI != null)
-                gameUI.renderMode = RenderMode.ScreenSpaceOverlay;
+            if (controller != null)
+            {
+                // 檢查 East 按鈕（B 鍵）或 Left D-Pad
+                if (controller.buttonEast.wasPressedThisFrame || controller.dpad.left.wasPressedThisFrame)
+                {
+                    anyButtonPressed = true;
+                    break;
+                }
+            }
         }
-        else
+        
+        if (anyButtonPressed)
         {
-            if (gameUI != null)
-                gameUI.renderMode = RenderMode.ScreenSpaceCamera;
+            GoToNextState();
         }
+        
+        // 其他階段設置 Camera 渲染模式
+        if (gameUI != null)
+            gameUI.renderMode = RenderMode.ScreenSpaceCamera;
     }
 
     /// <summary>
@@ -407,7 +454,7 @@ public class SceneController : MonoBehaviour
                 // ★ 恢復 BGM 音量
                 if (BGMController.Instance != null)
                 {
-                    BGMController.Instance.RestoreVolume();
+                    BGMController.Instance.SetVolume(0.2f);
                 }
                 
                 StartCoroutine(ShowLoadingTransition(GameState.Tutorial));
@@ -428,6 +475,8 @@ public class SceneController : MonoBehaviour
             case GameState.TutorialLoading:
                 Debug.Log("[SceneController] === 教學Loading ===");
                 gameUI.gameObject.SetActive(true);
+                rhythmGame.scoreText.text = 0.ToString();
+
                 StartCoroutine(ShowLoadingTransition(GameState.Gameplay));
                 break;
 
@@ -471,7 +520,6 @@ public class SceneController : MonoBehaviour
                     rhythmGame.enabled = true; // 啟用遊戲邏輯
                     rhythmGame.currentState = ScratchRhythmGame.GameState.WaitingForStart;
                     
-                    rhythmGame.scoreText.text = 0.ToString();
                     Debug.Log($"[SceneController] RhythmGame currentState 已設置為 {rhythmGame.currentState}");
                 }
                 else
@@ -679,15 +727,18 @@ public class SceneController : MonoBehaviour
             tc.maskAnimator.SetTrigger("Expand");
             // 等待 expand 動畫，如果 TransitionController 有設定的 expandTime 則等該時間
             // 等待 TransitionController 的 expand 動畫時間
-            yield return new WaitForSeconds(tc.expandTime);
+            blockoverlayswitch = true;
+            isTransitioning = false;
+            SetState(nextState);
+            yield return new WaitForSeconds(1.0f);
+            blockoverlayswitch = false;
             // 動畫結束後可選擇關閉遮罩物件（保留可視化）
             tc.maskAnimator.gameObject.SetActive(false);
         }
-
-        isTransitioning = false;
+        
 
         // 自動進入下一個狀態
-        SetState(nextState);
+        
     }
     IEnumerator tcFromOtherScene()
     {
@@ -834,7 +885,7 @@ public class SceneController : MonoBehaviour
     IEnumerator PlayGoodEnding()
     {
         // 延遲 2 秒
-        yield return new WaitForSeconds(2f);
+        yield return new WaitForSeconds(1f);
         
         // 在 goodEndingUI 中尋找 VideoPlayer 組件
         if (goodEndingUI != null)
@@ -855,7 +906,7 @@ public class SceneController : MonoBehaviour
     IEnumerator PlayBadEnding()
     {
         // 延遲 2 秒
-        yield return new WaitForSeconds(2f);
+        yield return new WaitForSeconds(1f);
         
         // 在 badEndingUI 中尋找 VideoPlayer 組件
         if (badEndingUI != null)
@@ -872,5 +923,24 @@ public class SceneController : MonoBehaviour
                 Debug.LogWarning("[SceneController] 在 prologueUI 中未找到 Video Player 組件");
             }
         }
+    }
+    
+    /// <summary>
+    /// 更新控制器列表 - 獲取所有連接的 Switch 控制器
+    /// </summary>
+    void UpdateControllerList()
+    {
+        allControllers.Clear();
+        
+        // 使用 InputSystem 查找所有 SwitchControllerHID 設備
+        foreach (var device in UnityEngine.InputSystem.InputSystem.devices)
+        {
+            if (device is SwitchControllerHID controller)
+            {
+                allControllers.Add(controller);
+            }
+        }
+        
+        Debug.Log($"[SceneController] 找到 {allControllers.Count} 個 Switch 控制器");
     }
 }

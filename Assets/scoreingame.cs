@@ -161,22 +161,28 @@ public class scoreingame : MonoBehaviour
     {
         // ★ 使用格式化字串顯示標籤和數值
         if (perfectText != null)
-            perfectText.text = $"Perfect:{perfectCount}";
+            // perfectText.text = $"Perfect:{perfectCount}";
+            perfectText.text = perfectCount.ToString();
         
         if (goodText != null)
-            goodText.text = $"Good:{goodCount}";
+            // goodText.text = $"Good:{goodCount}";
+            goodText.text = goodCount.ToString();
         
         if (okText != null)
-            okText.text = $"OK:{okCount}";
+            // okText.text = $"OK:{okCount}";
+            okText.text = okCount.ToString();
         
         if (missText != null)
-            missText.text = $"Miss:{missCount}";
+            // missText.text = $"Miss:{missCount}";
+            missText.text = missCount.ToString();
         
         if (maxComboText != null)
-            maxComboText.text = $"Max Combo:{maxCombo}";
+            // maxComboText.text = $"Max Combo:{maxCombo}";
+            maxComboText.text = maxCombo.ToString();
         
         if (totalScoreText != null)
-            totalScoreText.text = $"Score:{totalScore}";
+            // totalScoreText.text = $"Score:{totalScore}";
+            totalScoreText.text = totalScore.ToString();
     }
 
     /// <summary>

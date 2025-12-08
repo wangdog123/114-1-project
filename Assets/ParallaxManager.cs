@@ -46,7 +46,7 @@ public class ParallaxManager : MonoBehaviour
     private float bobTimer = 0f;
     private bool stepPlayed = false;
     private AudioSource footstepAudioSource;
-    private Volume dizzyVolume;
+    public Volume dizzyVolume;
     [Header("--- 暈眩效果設定 ---")]
     [Tooltip("暈眩持續時間 (秒)")]
     public float dizzyDuration = 2.0f;
