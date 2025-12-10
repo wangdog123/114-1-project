@@ -11,8 +11,8 @@ public class RhythmGenerator {
     };
 
     private List<NoteType> hardPool = new List<NoteType>() {
-        NoteType.Quarter, NoteType.Eighth, NoteType.Sixteenth,
-        NoteType.RestQuarter, NoteType.RestEighth, NoteType.RestSixteenth
+        NoteType.Quarter, NoteType.Eighth,
+        // NoteType.RestQuarter, NoteType.RestEighth, NoteType.RestSixteenth
     };
 
     public List<NoteType> GeneratePattern(float totalBeats, string difficulty) {

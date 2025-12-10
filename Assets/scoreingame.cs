@@ -222,9 +222,13 @@ public class scoreingame : MonoBehaviour
     }
     void Update()
     {
-        if(sceneController.currentState == SceneController.GameState.Gameplay&&missCount>=1)
+        if(sceneController.currentState == SceneController.GameState.Gameplay&&totalScore<=1500)
         {
             sceneController.SetEndingType(SceneController.EndingType.Bad);
+        }
+        else if(sceneController.currentState == SceneController.GameState.Gameplay&&totalScore>1500)
+        {
+            sceneController.SetEndingType(SceneController.EndingType.Good);
         }
     }
 }

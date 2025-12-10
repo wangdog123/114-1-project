@@ -454,7 +454,7 @@ public class SceneController : MonoBehaviour
                 // ★ 恢復 BGM 音量
                 if (BGMController.Instance != null)
                 {
-                    BGMController.Instance.SetVolume(0.2f);
+                    BGMController.Instance.SetVolume(0.3f);
                 }
                 
                 StartCoroutine(ShowLoadingTransition(GameState.Tutorial));
@@ -527,6 +527,7 @@ public class SceneController : MonoBehaviour
                     Debug.LogError("[SceneController] RhythmGame 為 null，無法設置狀態！");
                 }
                 BGMController.Instance.PlayGameplayBGM();
+                StartCoroutine(StartGame());
                 break;
 
             case GameState.GameplayLoading:
@@ -942,5 +943,10 @@ public class SceneController : MonoBehaviour
         }
         
         Debug.Log($"[SceneController] 找到 {allControllers.Count} 個 Switch 控制器");
+    }
+    IEnumerator StartGame()
+    {
+        yield return new WaitForSeconds(1.0f);
+        rhythmGame.startPressed = true;
     }
 }

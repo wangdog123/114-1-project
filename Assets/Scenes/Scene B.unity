@@ -2708,10 +2708,10 @@ MonoBehaviour:
   swingAnimator: {fileID: 673762852}
   caliAnimator: {fileID: 1205616238}
   stage1Text: "\u6B61\u8FCE\u4F86\u5230\u57F9\u6839\u884C\u52D5\uFF01\n\u5728\u6B63\u5F0F\u958B\u59CB\u524D\uFF0C\u5148\u4F86\u719F\u6089\u4E00\u4E0B\u904A\u6232\u64CD\u4F5C\u5427\uFF5E"
-  stage2Text: "\u8ACB\u6821\u6B63 Joy-Con\n"
+  stage2Text: "\u8ACB\u6821\u6B63 Joy-Con\n(\u8ACB\u7167\u8457\u4E0A\u65B9\u7684\u5F15\u5C0E\u64CD\u4F5C\uFF01"
   stage3Text: "\u8A66\u8457\u64CA\u4E2D\u9019\u9846\u77F3\u982D\uFF01"
-  stage4Text: "\u63A5\u4E0B\u4F86\u4F86\u5BE6\u969B\u6F14\u7DF4\u4E00\u904D\u5427\uFF01"
-  stage5Text: "\u6E96\u5099\u597D\u4E86\u561B\uFF1F\n\u904A\u6232\u5373\u5C07\u958B\u59CB\u56C9\uFF01"
+  stage4Text: "\u63A5\u4E0B\u4F86\u4F86\u5BE6\u969B\u6F14\u7DF4\u4E00\u904D\u5427\uFF01\n\u8A18\u4F4F\u7BC0\u594F\u8207\u65B9\u5411\u4E26\u6253\u51FA\u4F86"
+  stage5Text: "\u6E96\u5099\u597D\u4E86\u561B\uFF1F\n\u904A\u6232\u5373\u5C07\u958B\u59CB\u56C9\uFF01\n(\u8ACB\u6309A\u7E7C\u7E8C\uFF01"
   fadeInDuration: 1
   stayDuration: 2
   fadeOutDuration: 1
@@ -6160,6 +6160,7 @@ MonoBehaviour:
   skillCutsceneDuration: 0.5
   skillSlideInDuration: 0.5
   directionIndicatorImage: {fileID: 1359331136}
+  startPressed: 0
   lastSpawnedTutorialTarget: {fileID: 0}
 --- !u!1 &965826805
 GameObject:

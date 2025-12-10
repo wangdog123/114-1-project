@@ -225,6 +225,7 @@ public class ScratchRhythmGame : MonoBehaviour
     
     // 方向枚舉（大野狼抓取動作）
     public enum SlashDirection { Left, Right, DownLeft, DownRight }
+    public bool startPressed = false;
     
     void OnEnable()
     {
@@ -353,7 +354,7 @@ public class ScratchRhythmGame : MonoBehaviour
         if (currentState == GameState.WaitingForStart)
         {
             // 檢測任何一個 Joy-Con 的 Start 按鈕
-            bool startPressed = false;
+
             
             // ★ 直接檢查所有 SwitchControllerHID 設備
             foreach (var device in UnityEngine.InputSystem.InputSystem.devices)
@@ -458,6 +459,10 @@ public class ScratchRhythmGame : MonoBehaviour
                     // 檢查是否錯過（飛到死亡線）
                     if (currentTime >= deadlineTime)
                     {
+                        if (target.isPaused)
+                        {
+                            target.isMissed = false;
+                        }
                         target.isMissed = true;
                         
                         // 呼叫統一的錯過處理方法（包含震動、VFX、HitStop）
@@ -532,6 +537,7 @@ public class ScratchRhythmGame : MonoBehaviour
         if (isInGameplayPhase || currentState == GameState.Tutorial)
         {
             UpdateTimingIndicator();
+            UpdateDirectionIndicatorForCurrentTarget();
         }
     }
     
@@ -579,6 +585,40 @@ public class ScratchRhythmGame : MonoBehaviour
         }
     }
     
+    // ★ 更新方向提示（根據當前目標）
+    void UpdateDirectionIndicatorForCurrentTarget()
+    {
+        if (directionIndicatorImage == null)
+            return;
+        
+        // 找到下一個未擊中的物件
+        SlashTarget nextTarget = null;
+        int minStepIndex = int.MaxValue;
+        
+        foreach (var target in activeTargets)
+        {
+            if (target != null && !target.isHit && !target.isMissed)
+            {
+                if (target.stepIndex < minStepIndex)
+                {
+                    minStepIndex = target.stepIndex;
+                    nextTarget = target;
+                }
+            }
+        }
+        
+        if (nextTarget != null)
+        {
+            // 根據目標方向更新提示圖示的旋轉角度
+            UpdateDirectionIndicator(nextTarget.direction);
+        }
+        else
+        {
+            // 沒有目標時隱藏提示
+            HideDirectionIndicator();
+        }
+    }
+    
     // 全螢幕揮動檢測（支援多個控制器）
     void DetectSlashInput()
     {
@@ -612,12 +652,12 @@ public class ScratchRhythmGame : MonoBehaviour
         // 如果按了 WASD，檢查是否有匹配的飛行中物件
         if (pressedDirection.HasValue)
         {
-            // ★ 暈眩時不能打擊
-            if (parallaxManager != null && parallaxManager.IsDizzy)
-            {
-                Debug.Log("[測試] 暈眩中，無法打擊");
-                return;
-            }
+            // // ★ 暈眩時不能打擊
+            // if (parallaxManager != null && parallaxManager.IsDizzy)
+            // {
+            //     Debug.Log("[測試] 暈眩中，無法打擊");
+            //     return;
+            // }
             
             SlashTarget targetToHit = FindFlyingTarget(pressedDirection.Value);
             if (targetToHit != null)
@@ -636,10 +676,10 @@ public class ScratchRhythmGame : MonoBehaviour
             return;
         
         // ★ 暈眩時不能打擊
-        if (parallaxManager != null && parallaxManager.IsDizzy)
-        {
-            return;
-        }
+        // if (parallaxManager != null && parallaxManager.IsDizzy)
+        // {
+        //     return;
+        // }
         
         for (int cursorIndex = 0; cursorIndex < cursors.Length; cursorIndex++)
         {
@@ -916,10 +956,10 @@ public class ScratchRhythmGame : MonoBehaviour
         }
         else if (elapsedTime < 20f)
         {
-            return ("normal", 100f, elapsedTime);
+            return ("normal", 80f, elapsedTime);
         }
 
-        return ("hard", 120f, elapsedTime);
+        return ("hard", 80f, elapsedTime);
     }
 
     // === 技能演出系統 ===
@@ -1867,6 +1907,7 @@ public class ScratchRhythmGame : MonoBehaviour
         float currentTime = Time.time;
         
         // ★ 單音符教學模式：只能在目標暫停時揮動
+        bool isTutorialHit = false;
         if (isSingleNoteTutorial)
         {
             if(!target.isPaused)
@@ -1875,7 +1916,11 @@ public class ScratchRhythmGame : MonoBehaviour
                 target.isHit = false; // 重置 isHit 標記
                 return;
             }
-            else isSingleNoteTutorial = false; // 只允許一次
+            else 
+            {
+                isSingleNoteTutorial = false; // 只允許一次
+                isTutorialHit = true;
+            }
         }
         
         // ★ 檢查冷卻時間，防止一次揮動觸發多個物件
@@ -1908,7 +1953,7 @@ public class ScratchRhythmGame : MonoBehaviour
         }
         
         // ★ 單音符教學模式：強制判定為 Perfect
-        if (isSingleNoteTutorial)
+        if (isTutorialHit)
         {
             rating = "Perfect!!";
             points = 0;
