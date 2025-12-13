@@ -441,9 +441,9 @@ public class ScratchRhythmGame : MonoBehaviour
                 if (target != null && !target.isHit && !target.isMissed)
                 {
                     float currentTime = Time.time;
-                    // ★ 錯過判定：飛行時間 + OK 窗口
-                    // 超過這個時間表示連 OK 都拿不到了，直接算 Miss
-                    float deadlineTime = target.flyingStartTime + target.flyingDuration + okWindow;
+                    // ★ 錯過判定：飛行到達時間（視覺上已經到達鏡頭前方）
+                    // 投擲物到達目標點的時間
+                    float arrivalTime = target.flyingStartTime + target.flyingDuration;
                     
                     // 播放判定音效（在飛行開始時）
                     if (!target.hasPlayedJudgmentBeat && currentTime >= target.flyingStartTime)
@@ -456,8 +456,10 @@ public class ScratchRhythmGame : MonoBehaviour
                         target.hasPlayedJudgmentBeat = true;
                     }
                     
-                    // 檢查是否錯過（飛到死亡線）
-                    if (currentTime >= deadlineTime)
+                    // ★ 檢查是否錯過（投擲物已經在視覺上到達目標點）
+                    // 使用更小的容錯時間，讓視覺與判定同步
+                    float missDeadline = arrivalTime + 0.1f; // 只給 0.05 秒容錯
+                    if (currentTime >= missDeadline)
                     {
                         if (target.isPaused)
                         {
@@ -2910,7 +2912,7 @@ public class ScratchRhythmGame : MonoBehaviour
     {
         // ★ 確保關閉所有立繪和暗黑覆蓋
         yield return new WaitForSeconds(1.0f);
-        parallaxManager.dizzyVolume.weight = 0;
+        parallaxManager.impactVolume.weight = 0;
 
         if (skillCharacterImageLeft != null) 
             skillCharacterImageLeft.gameObject.SetActive(false);

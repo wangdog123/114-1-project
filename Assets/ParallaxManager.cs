@@ -46,28 +46,48 @@ public class ParallaxManager : MonoBehaviour
     private float bobTimer = 0f;
     private bool stepPlayed = false;
     private AudioSource footstepAudioSource;
-    public Volume dizzyVolume;
-    [Header("--- 暈眩效果設定 ---")]
-    [Tooltip("暈眩持續時間 (秒)")]
-    public float dizzyDuration = 2.0f;
+    
+    // ========== 舊版暈眩系統（已停用）==========
+    // public Volume dizzyVolume;
+    // [Header("--- 暈眩效果設定 ---")]
+    // [Tooltip("暈眩持續時間 (秒)")]
+    // public float dizzyDuration = 2.0f;
 
-    [Tooltip("整體晃動速度 (頻率)：數值越高晃得越快")]
-    public float dizzySpeed = 0.8f;
+    // [Tooltip("整體晃動速度 (頻率)：數值越高晃得越快")]
+    // public float dizzySpeed = 0.8f;
 
-    [Header("--- 晃動強度設定 (角度) ---")]
-    [Tooltip("X軸晃動強度 (上下看)：模擬點頭/抬頭的晃動幅度")]
-    public float dizzyStrengthX = 8.0f;
+    // [Header("--- 晃動強度設定 (角度) ---")]
+    // [Tooltip("X軸晃動強度 (上下看)：模擬點頭/抬頭的晃動幅度")]
+    // public float dizzyStrengthX = 8.0f;
 
-    [Tooltip("Y軸晃動強度 (左右看)：模擬搖頭的晃動幅度")]
-    public float dizzyStrengthY = 5.0f;
+    // [Tooltip("Y軸晃動強度 (左右看)：模擬搖頭的晃動幅度")]
+    // public float dizzyStrengthY = 5.0f;
 
-    [Header("--- 其他設定 ---")]
-    [Tooltip("淡入時間 (秒)")]
-    public float fadeInDuration = 0.2f;
-    [Tooltip("結束後的恢復時間 (秒)")]
-    public float recoveryDuration = 0.5f;
-    [Tooltip("暈眩圓周振幅的小型隨機抖動 (度數)，用於避免完全固定但不改變主要幅度)")]
-    public float amplitudeJitter = 0.3f;
+    // [Header("--- 其他設定 ---")]
+    // [Tooltip("淡入時間 (秒)")]
+    // public float fadeInDuration = 0.2f;
+    // [Tooltip("結束後的恢復時間 (秒)")]
+    // public float recoveryDuration = 0.5f;
+    // [Tooltip("暈眩圓周振幅的小型隨機抖動 (度數)，用於避免完全固定但不改變主要幅度)")]
+    // public float amplitudeJitter = 0.3f;
+    
+    // ========== 新版累積式視覺衝擊系統 ==========
+    [Header("--- 累積式視覺衝擊效果 ---")]
+    public Volume impactVolume; // 視覺衝擊後處理 Volume
+    
+    [Tooltip("單次被擊中增加的衝擊強度")]
+    [Range(0f, 1f)]
+    public float impactStrengthPerHit = 0.15f;
+    
+    [Tooltip("最大累積衝擊強度")]
+    [Range(0f, 1f)]
+    public float maxImpactStrength = 0.8f;
+    
+    [Tooltip("衝擊強度自然衰減速度（每秒）")]
+    public float impactDecayRate = 0.3f;
+    
+    [Tooltip("視覺衝擊持續時間（單次）")]
+    public float impactDuration = 0.5f;
 
     // Store initial scales and distances for each layer
     private Vector3[] _initialScales;
@@ -75,10 +95,14 @@ public class ParallaxManager : MonoBehaviour
     private bool _isInitialized = false;
 
     private Coroutine _cameraMoveCoroutine;
-    private bool isDizzy = false; // 是否正在暈眩中
     
-    // 公開暈眩狀態供其他腳本查詢
-    public bool IsDizzy => isDizzy;
+    // ========== 舊版暈眩系統（已停用）==========
+    // private bool isDizzy = false; // 是否正在暈眩中
+    // public bool IsDizzy => isDizzy;
+    
+    // ========== 新版累積式視覺衝擊系統 ==========
+    private float currentImpactStrength = 0f; // 當前累積的衝擊強度
+    private Coroutine impactDecayCoroutine = null; // 衰減協程
 
 #if UNITY_EDITOR
     // Editor-only variables for camera movement
@@ -121,7 +145,8 @@ public class ParallaxManager : MonoBehaviour
                 // Don't track scale changes since we control them dynamically
             }
         }
-        dizzyVolume = FindObjectOfType<Volume>();
+        // dizzyVolume = FindObjectOfType<Volume>(); // 舊版暈眩系統
+        impactVolume = FindObjectOfType<Volume>(); // 新版視覺衝擊系統
     }
 
     private bool HaveLayersChanged()
@@ -339,101 +364,154 @@ public class ParallaxManager : MonoBehaviour
             return;
         }
 
-        // 如果正在暈眩中，忽略新的 Hit Stop
-        if (isDizzy)
-            return;
-
-        Debug.Log("[ParallaxManager] 觸發 Hit Stop - 開始暈眩效果");
-
-        // 設置暈眩狀態（不停止相機移動協程，讓它自己處理）
-        isDizzy = true;
-
-        // 開始暈眩效果
-        StartCoroutine(DizzyEffect());
+        // ========== 舊版暈眩系統（已停用）==========
+        // if (isDizzy)
+        //     return;
+        // Debug.Log("[ParallaxManager] 觸發 Hit Stop - 開始暈眩效果");
+        // isDizzy = true;
+        // StartCoroutine(DizzyEffect());
+        
+        // ========== 新版累積式視覺衝擊系統 ==========
+        Debug.Log("[ParallaxManager] 觸發視覺衝擊效果");
+        
+        // 累積衝擊強度（不超過最大值）
+        currentImpactStrength = Mathf.Min(currentImpactStrength + impactStrengthPerHit, maxImpactStrength);
+        
+        // 更新後處理強度
+        if (impactVolume != null)
+        {
+            impactVolume.weight = currentImpactStrength;
+        }
+        
+        Debug.Log($"[ParallaxManager] 當前衝擊強度: {currentImpactStrength:F2}");
+        
+        // 重啟衰減協程
+        if (impactDecayCoroutine != null)
+        {
+            StopCoroutine(impactDecayCoroutine);
+        }
+        impactDecayCoroutine = StartCoroutine(ImpactDecayEffect());
     }
 
+    // ========== 舊版暈眩效果協程（已停用）==========
+    // /// <summary>
+    // /// 暈眩效果協程 - 讓鏡頭畫圈模擬暈眩感
+    // /// </summary>
+    // private IEnumerator DizzyEffect()
+    // {
+    //     // 1. 紀錄原始旋轉角度
+    //     Quaternion originalRotation = controlledTransform.rotation;
+    //     Vector3 originalEuler = originalRotation.eulerAngles;
+    //
+    //     float startTime = Time.time;
+    //     
+    //     Debug.Log($"[ParallaxManager] 開始暈眩 (速度:{dizzySpeed}, X強度:{dizzyStrengthX}, Y強度:{dizzyStrengthY})");
+    //
+    //     // ================= 階段一：暈眩晃動 =================
+    //     while (Time.time - startTime < dizzyDuration)
+    //     {
+    //         float elapsed = Time.time - startTime;
+    //         
+    //         // 計算淡入強度 (0 ~ 1)，讓暈眩有個開始的過程
+    //         float masterIntensity = Mathf.Clamp01(elapsed / fadeInDuration);
+    //
+    //         // 更新後處理權重
+    //         if (dizzyVolume != null) dizzyVolume.weight = masterIntensity;
+    //
+    //         // 使用穩定的圓周旋轉 (sin/cos) 映射到角度 (pitch/yaw)，並只加入小型的
+    //         // additive jitter 而不會改變主要振幅，確保整體幅度穩定一致。
+    //         float baseAngleSpeed = dizzySpeed; // 角速度基礎（rad/s）
+    //         // 累積角度驅動圓周運動
+    //         float baseAngle = Time.time * baseAngleSpeed;
+    //
+    //         // 穩定振幅 (不受噪聲大幅影響)
+    //         float ampX = dizzyStrengthX * masterIntensity;
+    //         float ampY = dizzyStrengthY * masterIntensity;
+    //
+    //         // 圓周運動映射到角度
+    //         float rotX = Mathf.Sin(baseAngle) * ampX;
+    //         float rotY = Mathf.Cos(baseAngle) * ampY;
+    //
+    //         // 小型 additive jitter (不要放大振幅，只作微調)
+    //         float jitterX = (Mathf.PerlinNoise(Time.time * 1.1f, 0f) - 0.5f) * 2f * amplitudeJitter;
+    //         float jitterY = (Mathf.PerlinNoise(0f, Time.time * 1.3f) - 0.5f) * 2f * amplitudeJitter;
+    //
+    //         // 應用到 camera（保留 Z 不變）
+    //         controlledTransform.rotation = Quaternion.Euler(
+    //             originalEuler.x + rotX + jitterX,
+    //             originalEuler.y + rotY + jitterY,
+    //             originalEuler.z
+    //         );
+    //
+    //         yield return null;
+    //     }
+    //
+    //     // ================= 階段二：平滑恢復 =================
+    //     Debug.Log("[ParallaxManager] 暈眩結束，開始回正...");
+    //     
+    //     float recoveryStart = Time.time;
+    //     Quaternion endDizzyRot = controlledTransform.rotation; // 記住暈眩最後一刻的角度
+    //     float startVolumeWeight = (dizzyVolume != null) ? dizzyVolume.weight : 0f;
+    //
+    //     while (Time.time - recoveryStart < recoveryDuration)
+    //     {
+    //         float t = (Time.time - recoveryStart) / recoveryDuration;
+    //         
+    //         // 使用 SmoothStep (S型曲線) 讓回正過程頭尾慢、中間快，比較自然
+    //         t = Mathf.SmoothStep(0f, 1f, t); 
+    //
+    //         // 使用 Slerp 平滑轉回原始角度
+    //         controlledTransform.rotation = Quaternion.Slerp(endDizzyRot, originalRotation, t);
+    //
+    //         // 淡出 Volume
+    //         if (dizzyVolume != null)
+    //             dizzyVolume.weight = Mathf.Lerp(startVolumeWeight, 0f, t);
+    //
+    //         yield return null;
+    //     }
+    //
+    //     // ================= 階段三：確保歸位 =================
+    //     if (dizzyVolume != null) dizzyVolume.weight = 0.0f;
+    //     controlledTransform.rotation = originalRotation;
+    //     isDizzy = false;
+    //     
+    //     Debug.Log("[ParallaxManager] 視線完全恢復");
+    // }
+    
     /// <summary>
-    /// 暈眩效果協程 - 讓鏡頭畫圈模擬暈眩感
+    /// 新版累積式視覺衝擊衰減效果
     /// </summary>
-    private IEnumerator DizzyEffect()
+    private IEnumerator ImpactDecayEffect()
     {
-        // 1. 紀錄原始旋轉角度
-        Quaternion originalRotation = controlledTransform.rotation;
-        Vector3 originalEuler = originalRotation.eulerAngles;
-
-        float startTime = Time.time;
+        // 等待一段時間後開始衰減
+        yield return new WaitForSeconds(impactDuration);
         
-        Debug.Log($"[ParallaxManager] 開始暈眩 (速度:{dizzySpeed}, X強度:{dizzyStrengthX}, Y強度:{dizzyStrengthY})");
-
-        // ================= 階段一：暈眩晃動 =================
-        while (Time.time - startTime < dizzyDuration)
+        Debug.Log("[ParallaxManager] 開始衰減視覺衝擊效果");
+        
+        // 逐漸衰減衝擊強度
+        while (currentImpactStrength > 0.01f)
         {
-            float elapsed = Time.time - startTime;
+            currentImpactStrength -= impactDecayRate * Time.deltaTime;
+            currentImpactStrength = Mathf.Max(0f, currentImpactStrength);
             
-            // 計算淡入強度 (0 ~ 1)，讓暈眩有個開始的過程
-            float masterIntensity = Mathf.Clamp01(elapsed / fadeInDuration);
-
-            // 更新後處理權重
-            if (dizzyVolume != null) dizzyVolume.weight = masterIntensity;
-
-            // 使用穩定的圓周旋轉 (sin/cos) 映射到角度 (pitch/yaw)，並只加入小型的
-            // additive jitter 而不會改變主要振幅，確保整體幅度穩定一致。
-            float baseAngleSpeed = dizzySpeed; // 角速度基礎（rad/s）
-            // 累積角度驅動圓周運動
-            float baseAngle = Time.time * baseAngleSpeed;
-
-            // 穩定振幅 (不受噪聲大幅影響)
-            float ampX = dizzyStrengthX * masterIntensity;
-            float ampY = dizzyStrengthY * masterIntensity;
-
-            // 圓周運動映射到角度
-            float rotX = Mathf.Sin(baseAngle) * ampX;
-            float rotY = Mathf.Cos(baseAngle) * ampY;
-
-            // 小型 additive jitter (不要放大振幅，只作微調)
-            float jitterX = (Mathf.PerlinNoise(Time.time * 1.1f, 0f) - 0.5f) * 2f * amplitudeJitter;
-            float jitterY = (Mathf.PerlinNoise(0f, Time.time * 1.3f) - 0.5f) * 2f * amplitudeJitter;
-
-            // 應用到 camera（保留 Z 不變）
-            controlledTransform.rotation = Quaternion.Euler(
-                originalEuler.x + rotX + jitterX,
-                originalEuler.y + rotY + jitterY,
-                originalEuler.z
-            );
-
+            // 更新後處理強度
+            if (impactVolume != null)
+            {
+                impactVolume.weight = currentImpactStrength;
+            }
+            
             yield return null;
         }
-
-        // ================= 階段二：平滑恢復 =================
-        Debug.Log("[ParallaxManager] 暈眩結束，開始回正...");
         
-        float recoveryStart = Time.time;
-        Quaternion endDizzyRot = controlledTransform.rotation; // 記住暈眩最後一刻的角度
-        float startVolumeWeight = (dizzyVolume != null) ? dizzyVolume.weight : 0f;
-
-        while (Time.time - recoveryStart < recoveryDuration)
+        // 確保完全歸零
+        currentImpactStrength = 0f;
+        if (impactVolume != null)
         {
-            float t = (Time.time - recoveryStart) / recoveryDuration;
-            
-            // 使用 SmoothStep (S型曲線) 讓回正過程頭尾慢、中間快，比較自然
-            t = Mathf.SmoothStep(0f, 1f, t); 
-
-            // 使用 Slerp 平滑轉回原始角度
-            controlledTransform.rotation = Quaternion.Slerp(endDizzyRot, originalRotation, t);
-
-            // 淡出 Volume
-            if (dizzyVolume != null)
-                dizzyVolume.weight = Mathf.Lerp(startVolumeWeight, 0f, t);
-
-            yield return null;
+            impactVolume.weight = 0f;
         }
-
-        // ================= 階段三：確保歸位 =================
-        if (dizzyVolume != null) dizzyVolume.weight = 0.0f;
-        controlledTransform.rotation = originalRotation;
-        isDizzy = false;
         
-        Debug.Log("[ParallaxManager] 視線完全恢復");
+        Debug.Log("[ParallaxManager] 視覺衝擊效果完全消退");
+        impactDecayCoroutine = null;
     }
 
     private IEnumerator MoveCameraCoroutine(Vector3 targetPosition, float duration)
@@ -454,12 +532,16 @@ public class ParallaxManager : MonoBehaviour
             // 總時間總是流逝 (維持總時長不變)
             elapsedTime += Time.deltaTime;
 
-            if (isDizzy)
-            {
-                // 暈眩中：不增加移動進度，不更新位置，但總時間繼續計算
-                // 這樣最終會因為 movementProgressTime < duration 而到不了終點
-            }
-            else
+            // ========== 舊版暈眩系統（已停用）==========
+            // if (isDizzy)
+            // {
+            //     // 暈眩中：不增加移動進度，不更新位置，但總時間繼續計算
+            //     // 這樣最終會因為 movementProgressTime < duration 而到不了終點
+            // }
+            // else
+            // {
+            
+            // ========== 新版：不停止移動 ==========
             {
                 // 只有沒暈眩時才增加移動進度
                 movementProgressTime += Time.deltaTime;
