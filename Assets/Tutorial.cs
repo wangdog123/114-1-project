@@ -20,6 +20,7 @@ public class Tutorial : MonoBehaviour
 
     [Header("Tutorial State")]
     public bool isTutorialCompleted = false; // ★ Tutorial 是否完成的旗標
+    public bool isWaitingForPlayerChoice = false; // ★ 是否正在等待玩家選擇（重複練習）
 
     [Header("Stage Objects")]
     public List<GameObject> calibrationObjects; // 第二幕：校正物件
@@ -45,6 +46,9 @@ public class Tutorial : MonoBehaviour
     public float fadeOutDuration = 1.0f;
     public float charTypingInterval = 0.05f; // ★ 逐字稿每個字的顯示間隔（秒）
     public float postTextPauseDuration = 2.0f; // ★ 文字顯示完後的停頓時間（秒）
+    private MultiSwitchControllerManager multiSwitchControllerManager;
+    public bool playerMadeChoice = false;
+    public bool chooseRepeat = false;
 
     private void OnEnable()
     {
@@ -173,6 +177,8 @@ public class Tutorial : MonoBehaviour
         {
             rhythmGame.perfectCircle.gameObject.SetActive(false);
         }
+        yield return new WaitForSeconds(1.5f);
+        sceneController.SetState(SceneController.GameState.TutorialLoading);
         
         // ★ 文字保持顯示，等待玩家準備
         // 可以在這裡加入按鈕或等待輸入的邏輯
@@ -493,51 +499,103 @@ public class Tutorial : MonoBehaviour
             rhythmGame.perfectCircle.gameObject.SetActive(false);
         }
 
-        // 設置教學模式標記，防止自動循環
-        rhythmGame.isTutorialMode = true;
-        
-        // ★ 設置 Tutorial 狀態
-        rhythmGame.currentState = ScratchRhythmGame.GameState.Tutorial;
-
-        // 訂閱回合結束事件
-        bool roundFinished = false;
-        System.Action onRoundEnd = () => { 
-            roundFinished = true;
-            Debug.Log("[Tutorial] 收到回合結束事件，設置 roundFinished = true");
-        };
-        rhythmGame.OnRoundComplete += onRoundEnd;
-
-        Debug.Log("[Tutorial] 開始 Easy Round");
-        // 開始 Easy Round
-        rhythmGame.StartNewRound("easy", 60f); // 慢一點的 BPM
-
-        Debug.Log("[Tutorial] 等待回合結束...");
-        // 等待回合結束
-        int frameCount = 0;
-        while (!roundFinished)
+        // ★ 重複練習循環
+        bool shouldContinuePractice = true;
+        while (shouldContinuePractice)
         {
-            frameCount++;
-            if (frameCount % 60 == 0) // 每秒輸出一次
+            // 設置教學模式標記，防止自動循環
+            rhythmGame.isTutorialMode = true;
+            
+            // ★ 設置 Tutorial 狀態
+            rhythmGame.currentState = ScratchRhythmGame.GameState.Tutorial;
+
+            // 訂閱回合結束事件
+            bool roundFinished = false;
+            System.Action onRoundEnd = () => { 
+                roundFinished = true;
+                Debug.Log("[Tutorial] 收到回合結束事件，設置 roundFinished = true");
+            };
+            rhythmGame.OnRoundComplete += onRoundEnd;
+
+            Debug.Log("[Tutorial] 開始 Easy Round");
+            // 開始 Easy Round
+            rhythmGame.StartNewRound("easy", 60f); // 慢一點的 BPM
+
+            Debug.Log("[Tutorial] 等待回合結束...");
+            // 等待回合結束
+            int frameCount = 0;
+            while (!roundFinished)
             {
-                Debug.Log($"[Tutorial] 仍在等待回合結束... roundFinished={roundFinished}");
+                frameCount++;
+                if (frameCount % 60 == 0) // 每秒輸出一次
+                {
+                    Debug.Log($"[Tutorial] 仍在等待回合結束... roundFinished={roundFinished}");
+                }
+                yield return null;
             }
-            yield return null;
-        }
-        
-        Debug.Log("[Tutorial] 回合結束循環退出，繼續執行");
+            // shouldContinuePractice = false; // 預設不再重複
+            
+            Debug.Log("[Tutorial] 回合結束循環退出，繼續執行");
 
-        // ★ 隱藏指示器
-        if (rhythmGame != null)
-        {
-            rhythmGame.HideDirectionIndicator();
-            rhythmGame.StopTimingIndicator();
-        }
+            // ★ 隱藏指示器
+            if (rhythmGame != null)
+            {
+                rhythmGame.HideDirectionIndicator();
+                rhythmGame.StopTimingIndicator();
+            }
 
-        // 取消訂閱
-        rhythmGame.OnRoundComplete -= onRoundEnd;
-        rhythmGame.isTutorialMode = false;
-        
-        Debug.Log("[Tutorial] 第四幕練習回合結束");
+            // 取消訂閱
+            rhythmGame.OnRoundComplete -= onRoundEnd;
+            rhythmGame.isTutorialMode = false;
+            
+            Debug.Log("[Tutorial] 第四幕練習回合結束");
+            
+            // ★ 顯示詢問對話框：是否再挑戰一次
+            yield return new WaitForSeconds(0.5f);
+            
+            // ★ 重置選擇狀態
+            playerMadeChoice = false;
+            chooseRepeat = false;
+            isWaitingForPlayerChoice = true; // ★ 允許 SceneController 接收按鍵
+            
+            if (textBackground != null)
+                textBackground.SetActive(true);
+            if (centerText != null)
+            {
+                centerText.gameObject.SetActive(true);
+                yield return StartCoroutine(TypeOutText("再挑戰一次?\n(A=是 / Y=否)"));
+            }
+            
+            // ★ 等待玩家按鍵選擇（SceneController 會設置這些變數）
+            while (!playerMadeChoice)
+            {
+                // 鍵盤輸入（備用）
+                if(Input.GetKeyDown(KeyCode.Space))
+                {
+                    chooseRepeat = true;
+                    playerMadeChoice = true;
+                    Debug.Log("[Tutorial] 玩家按下 Space，選擇再挑戰一次");
+                }
+                else if(Input.GetKeyDown(KeyCode.Return))
+                {
+                    chooseRepeat = false;
+                    playerMadeChoice = true;
+                    Debug.Log("[Tutorial] 玩家按下 Return，選擇不再挑戰");
+                }
+                yield return null;
+            }
+            
+            Debug.Log($"[Tutorial] 玩家選擇完成：chooseRepeat = {chooseRepeat}");
+            
+            // ★ 隱藏對話框
+            if (centerText != null)
+                centerText.gameObject.SetActive(false);
+            if (textBackground != null)
+                textBackground.SetActive(false);
+            
+            isWaitingForPlayerChoice = false; // ★ 關閉按鍵接收
+            shouldContinuePractice = chooseRepeat;
+        }
     }
 
     /// <summary>

@@ -121,11 +121,12 @@ public class SceneController : MonoBehaviour
         if (currentState == GameState.Tutorial && !developerMode)
         {
             // 如果 Tutorial 組件存在且未完成，禁止跳過
-            if (tutorial != null && !tutorial.isTutorialCompleted)
+            // ★ 但如果正在等待玩家選擇（重複練習），則允許按鍵輸入
+            if (tutorial != null && !tutorial.isTutorialCompleted && !tutorial.isWaitingForPlayerChoice)
             {
                 return; // Tutorial 正在執行，禁止跳過
             }
-            // Tutorial 已結束，允許繼續
+            // Tutorial 已結束或正在等待選擇，允許繼續
         }
         
         // ★ 定期更新控制器列表（每秒更新一次避免遺漏）
@@ -147,10 +148,27 @@ public class SceneController : MonoBehaviour
             if (controller != null)
             {
                 // 檢查 East 按鈕（B 鍵）或 Left D-Pad
-                if (controller.buttonEast.wasPressedThisFrame || controller.dpad.left.wasPressedThisFrame)
+                if(currentState != GameState.Gameplay && currentState != GameState.Tutorial){
+                    if (controller.buttonEast.wasPressedThisFrame || controller.dpad.left.wasPressedThisFrame)
+                    {
+                        anyButtonPressed = true;
+                        break;
+                    }
+                }
+                if(currentState == GameState.Tutorial && !tutorial.playerMadeChoice)
                 {
-                    anyButtonPressed = true;
-                    break;
+                    if(controller.buttonWest.wasPressedThisFrame)
+                    {
+                        tutorial.playerMadeChoice = true;
+                        tutorial.chooseRepeat = true;
+                        break;
+                    }
+                    if(controller.buttonEast.wasPressedThisFrame)
+                    {
+                        tutorial.playerMadeChoice = true;
+                        tutorial.chooseRepeat = false;
+                        break;
+                    }
                 }
             }
         }

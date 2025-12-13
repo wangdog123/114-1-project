@@ -2711,12 +2711,14 @@ MonoBehaviour:
   stage2Text: "\u8ACB\u6821\u6B63 Joy-Con\n(\u8ACB\u7167\u8457\u4E0A\u65B9\u7684\u5F15\u5C0E\u64CD\u4F5C\uFF01"
   stage3Text: "\u8A66\u8457\u64CA\u4E2D\u9019\u9846\u77F3\u982D\uFF01"
   stage4Text: "\u63A5\u4E0B\u4F86\u4F86\u5BE6\u969B\u6F14\u7DF4\u4E00\u904D\u5427\uFF01\n\u8A18\u4F4F\u7BC0\u594F\u8207\u65B9\u5411\u4E26\u6253\u51FA\u4F86"
-  stage5Text: "\u6E96\u5099\u597D\u4E86\u561B\uFF1F\n\u904A\u6232\u5373\u5C07\u958B\u59CB\u56C9\uFF01\n(\u8ACB\u6309A\u7E7C\u7E8C\uFF01"
+  stage5Text: "\u6E96\u5099\u597D\u4E86\u561B\uFF1F\n\u904A\u6232\u5373\u5C07\u958B\u59CB\u56C9\uFF01"
   fadeInDuration: 1
   stayDuration: 2
   fadeOutDuration: 1
   charTypingInterval: 0.1
   postTextPauseDuration: 2
+  playerMadeChoice: 0
+  chooseRepeat: 0
 --- !u!1 &510369003
 GameObject:
   m_ObjectHideFlags: 0
@@ -9249,7 +9251,7 @@ MonoBehaviour:
   m_margin: {x: -60.843933, y: 0, z: -801.98474, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
-  m_hasFontAssetChanged: 0
+  m_hasFontAssetChanged: 1
   m_baseMaterial: {fileID: 0}
   m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
 --- !u!1 &1759386017
