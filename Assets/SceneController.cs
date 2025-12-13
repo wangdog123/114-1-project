@@ -411,14 +411,15 @@ public class SceneController : MonoBehaviour
         switch (newState)
         {
             case GameState.Preparation:
+                StartCoroutine(tcFromOtherScene());
                 BGMController.Instance.Resume();
                 BGMController.Instance.PlayMenuBGM();
                 BGMController.Instance.RestoreVolume();
                 Debug.Log("[SceneController] === 準備階段 ===");
                 if (preparationUI != null)
                     preparationUI.SetActive(true);
-                if(tc.canvas != null)
-                    tc.canvas.gameObject.SetActive(false);
+                // if(tc.canvas != null)
+                //     tc.canvas.gameObject.SetActive(false);
                 if (rhythmGame != null)
                     rhythmGame.enabled = false;
                 break;
@@ -573,6 +574,7 @@ public class SceneController : MonoBehaviour
             case GameState.Ending:
                 if(currentScene == sceneBName)
                 {
+                    // StartCoroutine(tcFromOtherScene());
                     PlayerPrefs.SetInt("InheritedEndingType", (int)currentEndingType);
                     PlayerPrefs.SetString(GameState.Ending.ToString(), currentState.ToString());
                     PlayerPrefs.Save();
@@ -580,8 +582,8 @@ public class SceneController : MonoBehaviour
                     SceneManager.LoadScene(sceneAName);
                     return;
                 }
-                BGMController.Instance.Pause();
                 StartCoroutine(tcFromOtherScene());
+                BGMController.Instance.Pause();
                 Debug.Log("[SceneController] === 收尾階段 ===");
                 // 根據Ending類型顯示對應的UI
                 if (currentEndingType == EndingType.Good)
@@ -747,6 +749,7 @@ public class SceneController : MonoBehaviour
 
         if (tc != null && tc.maskAnimator != null)
         {
+            tc.maskAnimator.gameObject.SetActive(true);
             tc.maskAnimator.SetTrigger("Expand");
             // 等待 expand 動畫，如果 TransitionController 有設定的 expandTime 則等該時間
             // 等待 TransitionController 的 expand 動畫時間
@@ -865,7 +868,7 @@ public class SceneController : MonoBehaviour
     IEnumerator PlayPrologueVideo()
     {
         // 延遲 2 秒
-        yield return new WaitForSeconds(2f);
+        yield return new WaitForSeconds(1.0f);
         
         // 在 prologueUI 中尋找 VideoPlayer 組件
         if (prologueUI != null)
@@ -876,6 +879,20 @@ public class SceneController : MonoBehaviour
             {
                 Debug.Log("[SceneController] 找到 Video Player，開始播放");
                 videoPlayer.Play();
+                
+                // 等待影片實際開始播放（給一些時間讓 VideoPlayer 初始化）
+                yield return new WaitForSeconds(0.5f);
+                
+                // 等待影片播放完成
+                float duration = (float)videoPlayer.clip.length;
+                yield return new WaitForSeconds(duration);
+                
+                // 影片播放完成後，延遲 1 秒
+                yield return new WaitForSeconds(1f);
+                
+                // 自動進入下一個狀態
+                Debug.Log("[SceneController] Prologue 影片播放完成，自動進入下一個狀態");
+                GoToNextState();
             }
             else
             {
@@ -885,7 +902,7 @@ public class SceneController : MonoBehaviour
     }
     IEnumerator PlayGoodEnding()
     {
-        // 延遲 2 秒
+        // 延遲 1 秒
         yield return new WaitForSeconds(1f);
         
         // 在 goodEndingUI 中尋找 VideoPlayer 組件
@@ -897,16 +914,30 @@ public class SceneController : MonoBehaviour
             {
                 Debug.Log("[SceneController] 找到 Video Player，開始播放");
                 videoPlayer.Play();
+                
+                // 等待影片實際開始播放（給一些時間讓 VideoPlayer 初始化）
+                yield return new WaitForSeconds(0.5f);
+                
+                // 等待影片播放完成
+                float duration = (float)videoPlayer.clip.length;
+                yield return new WaitForSeconds(duration);
+                
+                // // 影片播放完成後，延遲 1 秒
+                // yield return new WaitForSeconds(1f);
+                
+                // 自動進入下一個狀態
+                Debug.Log("[SceneController] Good Ending 影片播放完成，自動進入下一個狀態");
+                GoToNextState();
             }
             else
             {
-                Debug.LogWarning("[SceneController] 在 prologueUI 中未找到 Video Player 組件");
+                Debug.LogWarning("[SceneController] 在 goodEndingUI 中未找到 Video Player 組件");
             }
         }
     }
     IEnumerator PlayBadEnding()
     {
-        // 延遲 2 秒
+        // 延遲 1 秒
         yield return new WaitForSeconds(1f);
         
         // 在 badEndingUI 中尋找 VideoPlayer 組件
@@ -918,10 +949,24 @@ public class SceneController : MonoBehaviour
             {
                 Debug.Log("[SceneController] 找到 Video Player，開始播放");
                 videoPlayer.Play();
+                
+                // 等待影片實際開始播放（給一些時間讓 VideoPlayer 初始化）
+                yield return new WaitForSeconds(0.5f);
+                
+                // 等待影片播放完成
+                float duration = (float)videoPlayer.clip.length;
+                yield return new WaitForSeconds(duration);
+                
+                // // 影片播放完成後，延遲 1 秒
+                // yield return new WaitForSeconds(1f);
+                
+                // 自動進入下一個狀態
+                Debug.Log("[SceneController] Bad Ending 影片播放完成，自動進入下一個狀態");
+                GoToNextState();
             }
             else
             {
-                Debug.LogWarning("[SceneController] 在 prologueUI 中未找到 Video Player 組件");
+                Debug.LogWarning("[SceneController] 在 badEndingUI 中未找到 Video Player 組件");
             }
         }
     }

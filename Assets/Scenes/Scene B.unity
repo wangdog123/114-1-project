@@ -2604,7 +2604,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   nextStateKey: 13
-  developerMode: 0
+  developerMode: 1
   sceneAName: Scene A
   sceneBName: Scene B
   sceneAObjects: []
