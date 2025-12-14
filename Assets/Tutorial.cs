@@ -563,7 +563,7 @@ public class Tutorial : MonoBehaviour
             if (centerText != null)
             {
                 centerText.gameObject.SetActive(true);
-                yield return StartCoroutine(TypeOutText("再挑戰一次?\n(A=是 / Y=否)"));
+                yield return StartCoroutine(TypeOutText("再挑戰一次?\n(Y=是 / A=否)"));
             }
             
             // ★ 等待玩家按鍵選擇（SceneController 會設置這些變數）

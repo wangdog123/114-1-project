@@ -227,7 +227,7 @@ public class ScratchRhythmGame : MonoBehaviour
     public enum SlashDirection { Left, Right, DownLeft, DownRight }
     public bool startPressed = false;
     
-    void OnEnable()
+    public void OnEnable()
     {
         // ★ 初始化技能演出UI狀態（隱藏）
         if (skillCharacterImageLeft != null) skillCharacterImageLeft.gameObject.SetActive(false);
@@ -1879,7 +1879,7 @@ public class ScratchRhythmGame : MonoBehaviour
         
         // sequenceDisplayText.text = $"完成！分數: {score}";
 
-        yield return new WaitForSeconds(2f);
+        // yield return new WaitForSeconds(2f);
         
         // ★ 移除難度提升邏輯，改由 StartNewRound 根據時間控制
         // currentLevel++;
@@ -2937,5 +2937,9 @@ public class ScratchRhythmGame : MonoBehaviour
         
         // ★ 重置旗標（下一場遊戲使用）
         isGameEnding = false;
+    }
+    public void uploadscore()
+    {
+        GoogleSheetDataHandler.Instance.UploadScore(score);
     }
 }

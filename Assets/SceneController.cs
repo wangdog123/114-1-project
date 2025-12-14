@@ -32,6 +32,7 @@ public class SceneController : MonoBehaviour
     // Ending判定
     public enum EndingType { Good, Bad } // Ending類型
     public EndingType currentEndingType = EndingType.Good;
+    private ScoreboardDisplay scoreboardDisplay;
 
     // 遊戲狀態
     public enum GameState
@@ -90,6 +91,7 @@ public class SceneController : MonoBehaviour
         
         // ★ 獲取所有連接的 Switch 控制器
         UpdateControllerList();
+        scoreboardDisplay = FindObjectOfType<ScoreboardDisplay>();
     }
 
     void Start()
@@ -430,6 +432,7 @@ public class SceneController : MonoBehaviour
         {
             case GameState.Preparation:
                 StartCoroutine(tcFromOtherScene());
+                GoogleSheetDataHandler.Instance.ShowInputField();
                 BGMController.Instance.Resume();
                 BGMController.Instance.PlayMenuBGM();
                 BGMController.Instance.RestoreVolume();
@@ -558,6 +561,7 @@ public class SceneController : MonoBehaviour
 
             case GameState.ScoreDisplay:
                 Debug.Log("[SceneController] === 顯示分數階段 ===");
+                StartCoroutine(UploadScore());
                 if (scoreUI != null)
                 {
                     scoreUI.SetActive(true);
@@ -1011,5 +1015,11 @@ public class SceneController : MonoBehaviour
     {
         yield return new WaitForSeconds(1.0f);
         rhythmGame.startPressed = true;
+    }
+    IEnumerator UploadScore()
+    {
+        rhythmGame.uploadscore();
+        yield return new WaitForSeconds(1.0f);
+        scoreboardDisplay.UpdateScoreBoard();
     }
 }
