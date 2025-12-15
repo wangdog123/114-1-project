@@ -225,6 +225,10 @@ public class ScratchRhythmGame : MonoBehaviour
     
     // 方向枚舉（大野狼抓取動作）
     public enum SlashDirection { Left, Right, DownLeft, DownRight }
+    
+    // ★ 新增手部枚舉
+    public enum Hand { Left, Right }
+    
     public bool startPressed = false;
     
     public void OnEnable()
@@ -233,9 +237,6 @@ public class ScratchRhythmGame : MonoBehaviour
         if (skillCharacterImageLeft != null) skillCharacterImageLeft.gameObject.SetActive(false);
         if (skillCharacterImageRight != null) skillCharacterImageRight.gameObject.SetActive(false);
         if (screenDarkOverlay != null) screenDarkOverlay.gameObject.SetActive(false);
-        
-        // ★ 初始化方向提示Image（隱藏）
-        if (directionIndicatorImage != null) directionIndicatorImage.gameObject.SetActive(false);
 
         // 初始化音效組件
         audioSource = GetComponent<AudioSource>();
@@ -317,6 +318,11 @@ public class ScratchRhythmGame : MonoBehaviour
             ShowCalibrationPrompt();
             Debug.Log("等待已連接的 Joy-Con 校正...");
             return;
+        }
+        else
+        {
+            currentState = GameState.WaitingForPlayer;
+            Debug.Log("等待玩家按下 Start 鍵開始遊戲...");
         }
 
     }
@@ -495,8 +501,7 @@ public class ScratchRhythmGame : MonoBehaviour
                 // 清除所有剩餘目標
                 ClearAllTargetsInternal();
                 
-                // 關閉方向提示 UI
-                HideDirectionIndicator();
+                // ★ 已移除方向提示
                 
                 // 關閉圓圈指示器 UI
                 StopTimingIndicator();
@@ -539,7 +544,8 @@ public class ScratchRhythmGame : MonoBehaviour
         if (isInGameplayPhase || currentState == GameState.Tutorial)
         {
             UpdateTimingIndicator();
-            UpdateDirectionIndicatorForCurrentTarget();
+            // ★ 已移除方向提示，不再需要更新
+            // UpdateDirectionIndicatorForCurrentTarget();
         }
     }
     
@@ -587,39 +593,39 @@ public class ScratchRhythmGame : MonoBehaviour
         }
     }
     
-    // ★ 更新方向提示（根據當前目標）
-    void UpdateDirectionIndicatorForCurrentTarget()
-    {
-        if (directionIndicatorImage == null)
-            return;
-        
-        // 找到下一個未擊中的物件
-        SlashTarget nextTarget = null;
-        int minStepIndex = int.MaxValue;
-        
-        foreach (var target in activeTargets)
-        {
-            if (target != null && !target.isHit && !target.isMissed)
-            {
-                if (target.stepIndex < minStepIndex)
-                {
-                    minStepIndex = target.stepIndex;
-                    nextTarget = target;
-                }
-            }
-        }
-        
-        if (nextTarget != null)
-        {
-            // 根據目標方向更新提示圖示的旋轉角度
-            UpdateDirectionIndicator(nextTarget.direction);
-        }
-        else
-        {
-            // 沒有目標時隱藏提示
-            HideDirectionIndicator();
-        }
-    }
+    // ★ 已移除：不再需要方向提示
+    // void UpdateDirectionIndicatorForCurrentTarget()
+    // {
+    //     if (directionIndicatorImage == null)
+    //         return;
+    //     
+    //     // 找到下一個未擊中的物件
+    //     SlashTarget nextTarget = null;
+    //     int minStepIndex = int.MaxValue;
+    //     
+    //     foreach (var target in activeTargets)
+    //     {
+    //         if (target != null && !target.isHit && !target.isMissed)
+    //         {
+    //             if (target.stepIndex < minStepIndex)
+    //             {
+    //                 minStepIndex = target.stepIndex;
+    //                 nextTarget = target;
+    //             }
+    //         }
+    //     }
+    //     
+    //     if (nextTarget != null)
+    //     {
+    //         // 根據目標方向更新提示圖示的旋轉角度
+    //         UpdateDirectionIndicator(nextTarget.direction);
+    //     }
+    //     else
+    //     {
+    //         // 沒有目標時隱藏提示
+    //         HideDirectionIndicator();
+    //     }
+    // }
     
     // 全螢幕揮動檢測（支援多個控制器）
     void DetectSlashInput()
@@ -627,48 +633,31 @@ public class ScratchRhythmGame : MonoBehaviour
         if (activeTargets.Count == 0)
             return;
         
-        // ★ WASD 快速測試（模擬完成劃動）
-        SlashDirection? pressedDirection = null;
+        // ★ WASD 快速測試（模擬完成劃動）- 改為按手部匹配
+        Hand? pressedHand = null;
         
-        if (Input.GetKeyDown(KeyCode.A)) // 左
+        if (Input.GetKeyDown(KeyCode.A)) // 左手
         {
-            pressedDirection = SlashDirection.Left;
-            Debug.Log("[測試] 按 A 鍵 - 模擬左劃");
+            pressedHand = Hand.Left;
+            Debug.Log("[測試] 按 A 鍵 - 模擬左手揮擊");
         }
-        else if (Input.GetKeyDown(KeyCode.D)) // 右
+        else if (Input.GetKeyDown(KeyCode.D)) // 右手
         {
-            pressedDirection = SlashDirection.Right;
-            Debug.Log("[測試] 按 D 鍵 - 模擬右劃");
-        }
-        else if (Input.GetKey(KeyCode.W)&&Input.GetKey(KeyCode.A)) // 左斜下
-        {
-            pressedDirection = SlashDirection.DownLeft;
-            Debug.Log("[測試] 按 W 鍵 - 模擬左斜下抓");
-        }
-        else if (Input.GetKey(KeyCode.W)&&Input.GetKey(KeyCode.D)) // 右斜下
-        {
-            pressedDirection = SlashDirection.DownRight;
-            Debug.Log("[測試] 按 S 鍵 - 模擬右斜下抓");
+            pressedHand = Hand.Right;
+            Debug.Log("[測試] 按 D 鍵 - 模擬右手揮擊");
         }
         
         // 如果按了 WASD，檢查是否有匹配的飛行中物件
-        if (pressedDirection.HasValue)
+        if (pressedHand.HasValue)
         {
-            // // ★ 暈眩時不能打擊
-            // if (parallaxManager != null && parallaxManager.IsDizzy)
-            // {
-            //     Debug.Log("[測試] 暈眩中，無法打擊");
-            //     return;
-            // }
-            
-            SlashTarget targetToHit = FindFlyingTarget(pressedDirection.Value);
+            SlashTarget targetToHit = FindFlyingTargetByHand(pressedHand.Value);
             if (targetToHit != null)
             {
                 OnSlashComplete(targetToHit, 150f, 0.3f); 
             }
             else
             {
-                Debug.Log($"[測試] 沒有飛行中的 {pressedDirection.Value} 方向物件");
+                Debug.Log($"[測試] 沒有飛行中的 {pressedHand.Value} 手物件");
             }
             return;
         }
@@ -730,7 +719,7 @@ public class ScratchRhythmGame : MonoBehaviour
                 {
                     state.lastAccelCheckTime = currentTime;
                     Debug.Log($"[加速度觸發] 光標 {cursorIndex}: 加速度 = {accelMagnitude:F2}, 閾值 = {minSlashAccel}");
-                    AnalyzeRecentSlash(cursorIndex, currentTime);
+                    AnalyzeRecentSlash(cursorIndex, currentTime, controller.controllerIndex);
                 }
             }
             else
@@ -748,7 +737,8 @@ public class ScratchRhythmGame : MonoBehaviour
                 float fallbackSpeedThreshold = 1200f;
                 if (speed >= fallbackSpeedThreshold)
                 {
-                    AnalyzeRecentSlash(cursorIndex, currentTime);
+                    // ★ 回退模式：無法判斷手部，預設使用左手（controllerIndex=1）
+                    AnalyzeRecentSlash(cursorIndex, currentTime, 1);
                 }
             }
         }
@@ -809,10 +799,66 @@ public class ScratchRhythmGame : MonoBehaviour
         
         return null;
     }
+    
+    // ★ 新增：根據手部尋找飛行中的下一個目標（強制按順序）
+    SlashTarget FindFlyingTargetByHand(Hand hand)
+    {
+        float currentTime = Time.time;
+        
+        // ★ 找出還沒被打的、stepIndex 最小的目標
+        SlashTarget nextTarget = null;
+        int minStepIndex = int.MaxValue;
+        
+        Debug.Log($"[FindFlyingTargetByHand] activeTargets.Count={activeTargets.Count}, 尋找手部={hand}, currentTime={currentTime:F3}");
+        
+        foreach (var target in activeTargets)
+        {
+            if (target == null || target.isHit || target.isMissed)
+            {
+                Debug.Log($"  [跳過] target==null:{target==null}, isHit:{target?.isHit}, isMissed:{target?.isMissed}");
+                continue;
+            }
+            
+            Debug.Log($"  [候選] stepIndex={target.stepIndex}, 手部={target.requiredHand}, 飛行時間=[{target.flyingStartTime:F3}, {target.flyingStartTime + target.flyingDuration:F3}]");
+            
+            if (target.stepIndex < minStepIndex)
+            {
+                minStepIndex = target.stepIndex;
+                nextTarget = target;
+            }
+        }
+        
+        // 檢查這個目標是否符合條件（手部匹配且在飛行中）
+        if (nextTarget != null)
+        {
+            Debug.Log($"  [找到候選] stepIndex={nextTarget.stepIndex}, 手部={nextTarget.requiredHand}, 檢查中...");
+            
+            // ★ 教學目標忽略時間窗口限制
+            bool isInTimeWindow = nextTarget.isTutorialTarget || 
+                                  (currentTime >= nextTarget.flyingStartTime && 
+                                   currentTime < nextTarget.flyingStartTime + nextTarget.flyingDuration);
+            
+            if (nextTarget.requiredHand == hand && isInTimeWindow)
+            {
+                Debug.Log($"  [成功找到] 目標#{nextTarget.stepIndex}");
+                return nextTarget;
+            }
+            else
+            {
+                Debug.Log($"  [條件不符] 手部匹配:{nextTarget.requiredHand == hand}, 在時間窗口內:{isInTimeWindow}, 是教學目標:{nextTarget.isTutorialTarget}");
+            }
+        }
+        else
+        {
+            Debug.Log($"  [沒找到目標] activeTargets 中沒有未被擊中的目標");
+        }
+        
+        return null;
+    }
 
     // === 新版劃動檢測核心方法 v3（多控制器版）===
 
-    void AnalyzeRecentSlash(int cursorIndex, float peakTime)
+    void AnalyzeRecentSlash(int cursorIndex, float peakTime, int controllerIndex)
     {
         if (!slashStates.ContainsKey(cursorIndex))
             return;
@@ -845,33 +891,23 @@ public class ScratchRhythmGame : MonoBehaviour
         float slashTime = state.timeHistory[state.timeHistory.Count - 1] - state.timeHistory[startIndex];
         float slashDist = Vector2.Distance(startPos, endPos);
 
-        // 3. 檢查距離
-        if (slashDist < minSlashDistance)
-        {
-            Debug.Log($"[Slash v3][控制器{cursorIndex}] ✗ 分析失敗：距離太短 ({slashDist:F1} < {minSlashDistance})");
-            return;
-        }
+        // 3. ★ 不再檢查距離，因為不需要方向判斷
+        // 只要加速度達到閉值即可
 
-        // 4. 判斷方向
-        Vector2 slashVector = (endPos - startPos).normalized;
-        SlashDirection dir = DetectDirection(slashVector);
+        // 4. ★ 根據控制器索引判斷手部
+        // controllerIndex 1 = 左手, controllerIndex 0 = 右手
+        Hand detectedHand = (controllerIndex == 1) ? Hand.Left : Hand.Right;
 
-        // if (dir == (SlashDirection)(-1))
-        // {
-        //     Debug.Log($"[Slash v3][控制器{cursorIndex}] ✗ 分析失敗：方向不明確");
-        //     return;
-        // }
-
-        // 5. 尋找目標
-        SlashTarget target = FindFlyingTarget(dir);
+        // 5. ★ 尋找匹配手部的目標
+        SlashTarget target = FindFlyingTargetByHand(detectedHand);
         if (target == null)
         {
-            Debug.Log($"[Slash v3][控制器{cursorIndex}] ✓ 分析成功，但無匹配目標。方向={dir}");
+            Debug.Log($"[Slash v3][控制器{cursorIndex}] ✓ 分析成功，但無匹配目標。手部={detectedHand}");
             return;
         }
 
         // 6. 成功！
-        Debug.Log($"[Slash v3][控制器{cursorIndex}] ✓✓✓ 成功！方向={dir}, 距離={slashDist:F1}, 時間={slashTime:F2}s");
+        Debug.Log($"[Slash v3][控制器{cursorIndex}] ✓✓✓ 成功！手部={detectedHand}, 距離={slashDist:F1}, 時間={slashTime:F2}s");
         // 反轉控制器索引（cursorIndex 0 -> controllerIndex 1, cursorIndex 1 -> controllerIndex 0）
         int controllerIndexForVibration = (cursorIndex == 0) ? 1 : 0;
         OnSlashComplete(target, slashDist, slashTime, controllerIndexForVibration);
@@ -1499,8 +1535,7 @@ public class ScratchRhythmGame : MonoBehaviour
             // 清除所有剩餘目標
             ClearAllTargetsInternal();
             
-            // 關閉方向提示 UI
-            HideDirectionIndicator();
+            // ★ 已移除方向提示
             
             // 關閉圓圈指示器 UI
             StopTimingIndicator();
@@ -1547,8 +1582,10 @@ public class ScratchRhythmGame : MonoBehaviour
 
         SlashDirection dir = currentSequence[currentSequenceIndex];
         
-        // ★ 更新方向提示 Image
-        UpdateDirectionIndicator(dir);
+        // ★ 隨機分配手部（左手或右手）
+        Hand requiredHand = (Random.value > 0.5f) ? Hand.Left : Hand.Right;
+        
+        // ★ 已移除方向提示
         
         // 播放提示音效
         if (beatSound != null && audioSource != null)
@@ -1602,6 +1639,7 @@ public class ScratchRhythmGame : MonoBehaviour
             target3D = targetObj.AddComponent<SlashTarget3D>();
         
         target3D.direction = dir;
+        target3D.requiredHand = requiredHand; // ★ 設置需要的手部
         target3D.stepIndex = currentSequenceIndex; // 使用 SequenceIndex
         target3D.spawnTime = Time.time;
         target3D.spawnPoint = spawnPoint;
@@ -1660,6 +1698,7 @@ public class ScratchRhythmGame : MonoBehaviour
             target3D = targetObj.AddComponent<SlashTarget3D>();
         
         target3D.direction = dir;
+        target3D.requiredHand = (Random.value > 0.5f) ? Hand.Left : Hand.Right; // ★ 隨機手部
         target3D.stepIndex = 999; // 特殊索引
         target3D.spawnTime = Time.time;
         target3D.spawnPoint = spawnPoint;
@@ -1711,52 +1750,50 @@ public class ScratchRhythmGame : MonoBehaviour
             Debug.Log("[Tutorial] 播放提示音效");
         }
         
-        // ★ 只更新方向提示，不啟動圓圈指示器
-        // 圓圈指示器會在玩家階段才啟動
-        UpdateDirectionIndicator(dir);
+        // ★ 已移除方向提示
         
         return target3D;
     }
     
-    // ★ 新增方法：更新方向提示 Image（通過旋轉）
-    void UpdateDirectionIndicator(SlashDirection direction)
-    {
-        if (directionIndicatorImage == null)
-        {
-            return;
-        }
-        
-        float rotationAngle = 0f;
-        
-        switch (direction)
-        {
-            case SlashDirection.Left:
-                rotationAngle = 180f; // 左
-                break;
-            case SlashDirection.Right:
-                rotationAngle = 0f; // 右
-                break;
-            case SlashDirection.DownLeft:
-                rotationAngle = 225f; // 左下
-                break;
-            case SlashDirection.DownRight:
-                rotationAngle = 315f; // 右下
-                break;
-        }
-        
-        directionIndicatorImage.rectTransform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
-        directionIndicatorImage.gameObject.SetActive(true);
-        Debug.Log($"[方向提示] 旋轉至 {rotationAngle}°（{direction}）");
-    }
+    // ★ 已移除：不再需要方向提示
+    // void UpdateDirectionIndicator(SlashDirection direction)
+    // {
+    //     if (directionIndicatorImage == null)
+    //     {
+    //         return;
+    //     }
+    //     
+    //     float rotationAngle = 0f;
+    //     
+    //     switch (direction)
+    //     {
+    //         case SlashDirection.Left:
+    //             rotationAngle = 180f; // 左
+    //             break;
+    //         case SlashDirection.Right:
+    //             rotationAngle = 0f; // 右
+    //             break;
+    //         case SlashDirection.DownLeft:
+    //             rotationAngle = 225f; // 左下
+    //             break;
+    //         case SlashDirection.DownRight:
+    //             rotationAngle = 315f; // 右下
+    //             break;
+    //     }
+    //     
+    //     directionIndicatorImage.rectTransform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
+    //     directionIndicatorImage.gameObject.SetActive(true);
+    //     Debug.Log($"[方向提示] 旋轉至 {rotationAngle}°（{direction}）");
+    // }
     
-    // ★ 新增方法：隱藏方向提示
-    public void HideDirectionIndicator()
-    {
-        if (directionIndicatorImage != null)
-        {
-            directionIndicatorImage.gameObject.SetActive(false);
-        }
-    }
+    // ★ 已移除：不再需要方向提示
+    // public void HideDirectionIndicator()
+    // {
+    //     if (directionIndicatorImage != null)
+    //     {
+    //         directionIndicatorImage.gameObject.SetActive(false);
+    //     }
+    // }
     
     // ★ 新增方法：根據方向計算投擲物的生成位置偏差（左到右四個區域）
     Vector3 CalculateDirectionOffset(SlashDirection direction)
@@ -1792,8 +1829,7 @@ public class ScratchRhythmGame : MonoBehaviour
     {
         currentState = GameState.Idle; // 暫停狀態
         
-        // ★ 隱藏方向提示（提示階段結束）
-        HideDirectionIndicator();
+        // ★ 已移除方向提示
         
         // ★ 移除等待時間，讓指示器能完整顯示 1 秒的縮小過程
         // yield return new WaitForSeconds(beatInterval * 0.5f);
@@ -1862,8 +1898,7 @@ public class ScratchRhythmGame : MonoBehaviour
     {
         Debug.Log("[回合結束] 開始下一輪準備");
         
-        // ★ 隱藏方向提示
-        HideDirectionIndicator();
+        // ★ 已移除方向提示
         
         // ★ 教學模式立即觸發事件並結束
         if (isTutorialMode)
@@ -2578,6 +2613,7 @@ public class ScratchRhythmGame : MonoBehaviour
             target3D = targetObj.AddComponent<SlashTarget3D>();
         
         target3D.direction = direction;
+        target3D.requiredHand = (Random.value > 0.5f) ? Hand.Left : Hand.Right; // ★ 隨機手部
         target3D.stepIndex = activeTargets.Count;
         target3D.spawnTime = Time.time;
         target3D.hasPlayedJudgmentBeat = false;
@@ -2788,6 +2824,7 @@ public class ScratchRhythmGame : MonoBehaviour
         
         SlashTarget3D target3D = targetObj.AddComponent<SlashTarget3D>();
         target3D.direction = dir;
+        target3D.requiredHand = (Random.value > 0.5f) ? Hand.Left : Hand.Right; // ★ 隨機手部
         target3D.spawnTime = Time.time;
         target3D.spawnPoint = spawnPoint;
         target3D.targetPoint = targetPoint;
@@ -2819,8 +2856,7 @@ public class ScratchRhythmGame : MonoBehaviour
         activeTargets.Add(target3D);
         lastSpawnedTutorialTarget = target3D;
         
-        // ★ Update indicator
-        UpdateDirectionIndicator(dir);
+        // ★ 已移除方向提示
         
         // ★ Activate Timing Circle
         // We manually set the timing variables to match this single target
@@ -2861,6 +2897,7 @@ public class ScratchRhythmGame : MonoBehaviour
                 
                 SlashTarget3D target3D = targetObj.AddComponent<SlashTarget3D>();
                 target3D.direction = dir;
+                target3D.requiredHand = (Random.value > 0.5f) ? Hand.Left : Hand.Right; // ★ 隨機手部
                 target3D.spawnTime = Time.time;
                 target3D.spawnPoint = spawnPoint;
                 target3D.targetPoint = targetPoint;
@@ -2887,8 +2924,7 @@ public class ScratchRhythmGame : MonoBehaviour
                 activeTargets.Add(target3D);
             }
 
-            // ★ Update Indicators
-            UpdateDirectionIndicator(dir);
+            // ★ 已移除方向提示
             
             // Ensure Timing Indicator is running for this new target
             if (!isIndicatorActive)

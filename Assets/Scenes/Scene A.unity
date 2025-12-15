@@ -481,6 +481,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: GoogleSheetService
       objectReference: {fileID: 0}
+    - target: {fileID: 3344495015367086756, guid: 1b432a3aade60ac4eabfcb5f1d57de83, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 4974761939252601536, guid: 1b432a3aade60ac4eabfcb5f1d57de83, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0

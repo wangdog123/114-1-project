@@ -456,11 +456,11 @@ public class Tutorial : MonoBehaviour
             focusPanel.SetActive(false);
 
         // ★ 隱藏指示器
-        if (rhythmGame != null)
-        {
-            rhythmGame.HideDirectionIndicator();
-            rhythmGame.StopTimingIndicator();
-        }
+        // if (rhythmGame != null)
+        // {
+        //     rhythmGame.HideDirectionIndicator();
+        //     rhythmGame.StopTimingIndicator();
+        // }
 
         // 稍微等待一下
         yield return new WaitForSeconds(1.0f);
@@ -538,11 +538,11 @@ public class Tutorial : MonoBehaviour
             Debug.Log("[Tutorial] 回合結束循環退出，繼續執行");
 
             // ★ 隱藏指示器
-            if (rhythmGame != null)
-            {
-                rhythmGame.HideDirectionIndicator();
-                rhythmGame.StopTimingIndicator();
-            }
+            // if (rhythmGame != null)
+            // {
+            //     rhythmGame.HideDirectionIndicator();
+            //     rhythmGame.StopTimingIndicator();
+            // }
 
             // 取消訂閱
             rhythmGame.OnRoundComplete -= onRoundEnd;

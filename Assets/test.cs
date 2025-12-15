@@ -196,8 +196,8 @@ public class test : MonoBehaviour
             if (Time.timeScale <= 0f)
             return; // 如果游戏暂停，则跳过所有逻辑
 
-            if (!Calibrated)
-                return;
+            // if (!Calibrated)
+            //     return;
             // 讀取 IMU 數據
             aRaw = currentController.acceleration.ReadValue();
             Vector3 orientationEuler = currentController.orientation.ReadValue();

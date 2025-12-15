@@ -18,6 +18,7 @@ public abstract class SlashTarget : MonoBehaviour
     public AudioClip hitSound; // ★ 該目標特定的擊中音效
     public bool isTutorialTarget = false; // ★ 是否為教學目標（忽略時間窗口限制）
     public bool isPaused = false; // ★ 是否暫停飛行（單音符教學用）
+    public ScratchRhythmGame.Hand requiredHand; // ★ 需要使用的手部（左/右）
     
     public abstract void Initialize();
     public abstract void MarkAsCompleted();
@@ -149,6 +150,16 @@ public class SlashTarget3D : SlashTarget
     {
         // ★ 不再旋轉，因為現在不同方向會使用不同的 Prefab/圖片
         // RotateSpriteToDirection();
+        
+        // ★ 根據需要的手部設置視覺提示（例如顏色）
+        if (targetSpriteRenderer != null)
+        {
+            // 左手：藍色調，右手：紅色調
+            Color handColor = (requiredHand == ScratchRhythmGame.Hand.Left) 
+                ? new Color(0.5f, 0.7f, 1f, 1f)  // 淡藍色
+                : new Color(1f, 0.5f, 0.5f, 1f); // 淡紅色
+            targetSpriteRenderer.color = handColor;
+        }
     }
     
     // 根據方向旋轉劃痕 Sprite（只旋轉 sprite，不旋轉整個物件）
