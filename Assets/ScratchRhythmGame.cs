@@ -73,10 +73,12 @@ public class ScratchRhythmGame : MonoBehaviour
     public bool debugMode = false; // 開啟 Debug 模式
     public bool isTutorialMode = false; // ★ 是否為教學模式（不自動循環）
     public bool isSingleNoteTutorial = false; // ★ 是否為單音符教學（只顯示Perfect，只能暫停時揮動）
-    public KeyCode debugEasy = KeyCode.Alpha1; // 按 1 生成左
-    public KeyCode debugNormal = KeyCode.Alpha2; // 按 2 生成右
-    public KeyCode debugHard = KeyCode.Alpha3; // 按 3 生成上
+    public KeyCode debugEasy = KeyCode.Alpha1; // 按 1 生成 Easy 難度序列
+    public KeyCode debugNormal = KeyCode.Alpha2; // 按 2 生成 Normal 難度序列
+    public KeyCode debugHard = KeyCode.Alpha3; // 按 3 生成 Hard 難度序列
     public KeyCode debugClearKey = KeyCode.C; // 按 C 清除所有目標
+    public KeyCode debugSingleLeftKey = KeyCode.Q; // ★ 按 Q 生成單音符左手
+    public KeyCode debugSingleRightKey = KeyCode.E; // ★ 按 E 生成單音符右手
     
     [Header("UI 引用")]
     public GameObject slashTargetPrefab; // 3D 目標預製體
@@ -409,6 +411,70 @@ public class ScratchRhythmGame : MonoBehaviour
                 return;
             }
             
+            // ★ 按 Q 生成單音符左手
+            if (Input.GetKeyDown(debugSingleLeftKey))
+            {
+                Debug.Log("[Debug] 按 Q 生成單音符左手");
+                isInGameplayPhase = true;
+                // 隨機方向
+                SlashDirection randomDir = (SlashDirection)Random.Range(0, 4);
+                SpawnDebugTarget(randomDir);
+                // 設置為左手
+                if (activeTargets.Count > 0)
+                {
+                    activeTargets[activeTargets.Count - 1].requiredHand = Hand.Left;
+                    if (activeTargets[activeTargets.Count - 1] is SlashTarget3D target3D)
+                    {
+                        target3D.Initialize(); // 重新初始化以更新顏色
+                    }
+                }
+                
+                // ★ 初始化和啟動圓圈指示器
+                InitializeTimingIndicator();
+                if (activeTargets.Count > 0)
+                {
+                    SlashTarget target = activeTargets[activeTargets.Count - 1];
+                    lastPlayerHitTime = Time.time;
+                    float remainingTime = (target.flyingStartTime + target.flyingDuration) - Time.time;
+                    target.customInterval = remainingTime;
+                    ActivateTimingIndicator(remainingTime);
+                    Debug.Log($"[指示器] 為左手目標啟動，剩餘時間={remainingTime:F2}s");
+                }
+                return;
+            }
+            
+            // ★ 按 E 生成單音符右手
+            if (Input.GetKeyDown(debugSingleRightKey))
+            {
+                Debug.Log("[Debug] 按 E 生成單音符右手");
+                isInGameplayPhase = true;
+                // 隨機方向
+                SlashDirection randomDir = (SlashDirection)Random.Range(0, 4);
+                SpawnDebugTarget(randomDir);
+                // 設置為右手
+                if (activeTargets.Count > 0)
+                {
+                    activeTargets[activeTargets.Count - 1].requiredHand = Hand.Right;
+                    if (activeTargets[activeTargets.Count - 1] is SlashTarget3D target3D)
+                    {
+                        target3D.Initialize(); // 重新初始化以更新顏色
+                    }
+                }
+                
+                // ★ 初始化和啟動圓圈指示器
+                InitializeTimingIndicator();
+                if (activeTargets.Count > 0)
+                {
+                    SlashTarget target = activeTargets[activeTargets.Count - 1];
+                    lastPlayerHitTime = Time.time;
+                    float remainingTime = (target.flyingStartTime + target.flyingDuration) - Time.time;
+                    target.customInterval = remainingTime;
+                    ActivateTimingIndicator(remainingTime);
+                    Debug.Log($"[指示器] 為右手目標啟動，剩餘時間={remainingTime:F2}s");
+                }
+                return;
+            }
+            
             if (Input.GetKeyDown(debugEasy))
             {
                 Debug.Log("[Debug] 按 1 生成 Easy 難度序列");
@@ -489,8 +555,8 @@ public class ScratchRhythmGame : MonoBehaviour
         
         if (isInGameplayPhase)
         {
-            // ★ 檢查時間是否為 0（非教學模式）
-            if (!isTutorialMode && !isGameEnding && timeUIController != null && timeUIController.RemainingTime <= 0)
+            // ★ 檢查時間是否為 0（非教學模式，且非 Debug 模式）
+            if (!isTutorialMode && !debugMode && !isGameEnding && timeUIController != null && timeUIController.RemainingTime <= 0)
             {
                 Debug.Log("[遊戲階段] 時間已到，清除所有目標並關閉 UI");
                 
@@ -1005,8 +1071,8 @@ public class ScratchRhythmGame : MonoBehaviour
     // 開始技能演出
     void StartSkillCutscene(string nextDifficulty = null, float nextBpm = -1f)
     {
-        // ★ 如果時間已到 0，跳過 cutscene 和音符生成
-        if (!isTutorialMode && timeUIController != null && timeUIController.RemainingTime <= 0)
+        // ★ 如果時間已到 0，跳過 cutscene 和音符生成（除非在 Debug 模式）
+        if (!isTutorialMode && !debugMode && timeUIController != null && timeUIController.RemainingTime <= 0)
         {
             Debug.Log("[技能演出] 時間已到，跳過演出");
             StartCoroutine(GameEnded());
@@ -1526,8 +1592,8 @@ public class ScratchRhythmGame : MonoBehaviour
     // 在節拍上生成下一個目標（提示階段）
     void SpawnNextBeatTarget()
     {
-        // ★ 檢查時間是否到期，如果時間 <= 0 就不再生成（教學模式跳過）
-        if (!isTutorialMode && timeUIController != null && timeUIController.RemainingTime <= 0)
+        // ★ 檢查時間是否到期，如果時間 <= 0 就不再生成（教學模式跳過，Debug 模式也跳過）
+        if (!isTutorialMode && !debugMode && timeUIController != null && timeUIController.RemainingTime <= 0)
         {
             currentState = GameState.Idle;
             Debug.Log("[遊戲階段] 時間已到，清除所有目標並關閉 UI");
