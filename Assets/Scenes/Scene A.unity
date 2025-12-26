@@ -542,17 +542,58 @@ PrefabInstance:
       propertyPath: m_Name
       value: Scoreboard
       objectReference: {fileID: 0}
+    - target: {fileID: 88488735126802298, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 219972837720215092, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
       propertyPath: m_TargetDisplay
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1703971282315862287, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
       propertyPath: m_text
-      value: 113AC1016 10000
+      value: '113AC1016 10000
+
+        113AC1016 10000
+
+        113AC1016 10000
+
+        113AC1016
+        10000
+
+        113AC1016 10000'
+      objectReference: {fileID: 0}
+    - target: {fileID: 1703971282315862287, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
+      propertyPath: m_fontSize
+      value: 68.25
+      objectReference: {fileID: 0}
+    - target: {fileID: 1703971282315862287, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
+      propertyPath: m_fontAsset
+      value: 
+      objectReference: {fileID: 11400000, guid: 2e498d1c8094910479dc3e1b768306a4, type: 2}
+    - target: {fileID: 1703971282315862287, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
+      propertyPath: m_fontStyle
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1703971282315862287, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
       propertyPath: m_lineSpacing
       value: 55
+      objectReference: {fileID: 0}
+    - target: {fileID: 1703971282315862287, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
+      propertyPath: m_fontSizeBase
+      value: 68.25
+      objectReference: {fileID: 0}
+    - target: {fileID: 1703971282315862287, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
+      propertyPath: m_sharedMaterial
+      value: 
+      objectReference: {fileID: 2180264, guid: 2e498d1c8094910479dc3e1b768306a4, type: 2}
+    - target: {fileID: 1703971282315862287, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
+      propertyPath: m_paragraphSpacing
+      value: 49.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1703971282315862287, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
+      propertyPath: m_hasFontAssetChanged
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2001814496780051571, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
       propertyPath: m_LocalPosition.x
@@ -595,12 +636,16 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6934058249237230530, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 983.156
+      objectReference: {fileID: 0}
+    - target: {fileID: 6934058249237230530, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
       propertyPath: m_AnchoredPosition.x
       value: 530
       objectReference: {fileID: 0}
     - target: {fileID: 6934058249237230530, guid: df7243b741017bf49a96f99e0af0b758, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -220
+      value: -228.42194
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
